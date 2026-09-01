@@ -1,0 +1,11 @@
+package com.wansheng.visitor.admin;
+import com.fasterxml.jackson.databind.*;import java.time.*;import java.util.*;import org.springframework.beans.factory.annotation.Value;import org.springframework.web.bind.annotation.*;import org.springframework.web.client.RestClient;
+@RestController @RequestMapping("/api/visitor/admin")class AdminQueryController{
+ private final RestClient client;private final String registration,guard,dorm,token;AdminQueryController(@Value("${visitor.admin.registration-url}")String r,@Value("${visitor.admin.guard-url}")String g,@Value("${visitor.admin.dormitory-url}")String d,@Value("${visitor.admin.internal-token}")String t){client=RestClient.builder().build();registration=r;guard=g;dorm=d;token=t;}
+ private JsonNode get(String url){return client.get().uri(url).header("X-Internal-Token",token).retrieve().body(JsonNode.class);}
+ @GetMapping("/registrations")JsonNode registrations(){return get(registration+"/internal/registrations/admin-view?limit=200");}
+ @GetMapping("/guard-records")JsonNode guards(){return get(guard+"/internal/guard/records");}
+ @GetMapping("/dormitory-records")JsonNode dormitory(){return get(dorm+"/internal/dormitory/records");}
+ @GetMapping("/audit-logs")List<JsonNode> audits(){List<JsonNode>all=new ArrayList<>();get(guard+"/internal/guard/audits").forEach(all::add);get(dorm+"/internal/dormitory/audits").forEach(all::add);return all;}
+ @GetMapping("/dashboard")Map<String,Integer> dashboard(){JsonNode rs=registrations(),gs=guards(),ds=dormitory();int today=0,waiting=0,inFactory=0,exited=0,needsDorm=0,pendingBed=0,currentDorm=0;LocalDate now=LocalDate.now(ZoneOffset.UTC);for(JsonNode r:rs)if(Instant.parse(r.path("registeredAt").asText()).atZone(ZoneOffset.UTC).toLocalDate().equals(now))today++;for(JsonNode g:gs){switch(g.path("guardStatus").asText()){case"WAITING_ENTRY"->waiting++;case"IN_FACTORY"->inFactory++;case"EXITED"->exited++;}}for(JsonNode d:ds)if(d.path("accommodationRequired").asBoolean()){needsDorm++;if(d.path("bedCode").isMissingNode()||d.path("bedCode").isNull())pendingBed++;else currentDorm++;}return Map.of("todayRegistrations",today,"waitingEntry",waiting,"inFactory",inFactory,"exited",exited,"needsAccommodation",needsDorm,"pendingBed",pendingBed,"currentAccommodation",currentDorm);}
+}

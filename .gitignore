@@ -1,0 +1,11 @@
+target/
+node_modules/
+dist/
+.idea/
+.vscode/
+*.iml
+*.log
+*.tsbuildinfo
+.env
+.DS_Store
+.chrome-smoke-profile/

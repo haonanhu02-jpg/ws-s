@@ -1,0 +1,25 @@
+server:
+  port: ${SERVER_PORT:8081}
+spring:
+  application:
+    name: auth-service
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/visitor_database?currentSchema=auth_schema}
+    username: ${DB_USERNAME:visitor}
+    password: ${DB_PASSWORD:visitor}
+  flyway:
+    schemas: auth_schema
+    default-schema: auth_schema
+    create-schemas: true
+visitor:
+  bootstrap.password: ${VISITOR_BOOTSTRAP_PASSWORD:change-me-in-env}
+  security:
+    guard-password: ${VISITOR_SECURITY_GUARD_PASSWORD:guard-dev-only}
+    dorm-password: ${VISITOR_SECURITY_DORM_PASSWORD:dorm-dev-only}
+    admin-password: ${VISITOR_SECURITY_ADMIN_PASSWORD:admin-dev-only}
+    jwt-secret: ${VISITOR_JWT_SECRET:visitor-jwt-development-secret-change-before-production}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

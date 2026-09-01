@@ -1,0 +1,1 @@
+package com.wansheng.visitor.dormitory;import static org.assertj.core.api.Assertions.assertThat;import java.util.Arrays;import org.junit.jupiter.api.Test;class DormitoryAdminViewTest{@Test void excludesIdentityCard(){assertThat(Arrays.stream(DormitoryAdminView.class.getRecordComponents()).map(c->c.getName())).doesNotContain("identityCardNumber");}}

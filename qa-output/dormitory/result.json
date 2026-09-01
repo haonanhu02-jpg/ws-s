@@ -1,0 +1,72 @@
+{
+  "errors": [],
+  "url": "http://127.0.0.1:8088/visitor/dormitory",
+  "desktopOverflow": false,
+  "mobileOverflow": false,
+  "layout": {
+    ".dorm-head": {
+      "x": 0,
+      "y": 0,
+      "width": 2048,
+      "height": 56,
+      "display": "flex",
+      "order": "0"
+    },
+    ".dorm-title": {
+      "x": 20,
+      "y": 17.5,
+      "width": 159.265625,
+      "height": 20,
+      "display": "flex",
+      "order": "0"
+    },
+    ".region-tabs": {
+      "x": 199.265625,
+      "y": -2.484375,
+      "width": 1681.625,
+      "height": 59.984375,
+      "display": "flex",
+      "order": "0"
+    },
+    ".region-primary": {
+      "x": 199.265625,
+      "y": -2.484375,
+      "width": 258.6875,
+      "height": 30.796875,
+      "display": "flex",
+      "order": "0"
+    },
+    ".dorm-account": {
+      "x": 1900.890625,
+      "y": 13.90625,
+      "width": 127.109375,
+      "height": 27.1875,
+      "display": "flex",
+      "order": "0"
+    },
+    ".dorm-nav": {
+      "x": 0,
+      "y": 92,
+      "width": 176,
+      "height": 897,
+      "display": "flex",
+      "order": "0"
+    },
+    ".dorm-content": {
+      "x": 176,
+      "y": 56,
+      "width": 1872,
+      "height": 933,
+      "display": "block",
+      "order": "0"
+    },
+    ".dorm-stats article": {
+      "x": 196,
+      "y": 180.1875,
+      "width": 295.328125,
+      "height": 92.984375,
+      "display": "grid",
+      "order": "0"
+    }
+  }
+}

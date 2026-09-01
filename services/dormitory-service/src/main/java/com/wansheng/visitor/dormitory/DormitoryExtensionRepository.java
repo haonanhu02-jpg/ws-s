@@ -1,0 +1,33 @@
+package com.wansheng.visitor.dormitory;
+
+import static com.wansheng.visitor.dormitory.EmployeeDormitoryModels.*;
+import java.math.*;
+import java.sql.*;
+import java.time.Instant;
+import java.util.*;
+import org.springframework.jdbc.core.*;
+import org.springframework.jdbc.support.*;
+import org.springframework.stereotype.Repository;
+
+@Repository
+class DormitoryExtensionRepository {
+ private final JdbcTemplate jdbc;
+ DormitoryExtensionRepository(JdbcTemplate jdbc){this.jdbc=jdbc;}
+ long addAttachment(long stayId,String type,String original,String stored,String content,long size,String op){return insert("INSERT INTO dorm_stay_attachment(stay_id,attachment_type,original_name,stored_name,content_type,file_size,operator_name) VALUES(?,?,?,?,?,?,?)",stayId,type,original,stored,content,size,op);}
+ List<StayAttachment> attachments(long stayId){return jdbc.query("SELECT * FROM dorm_stay_attachment WHERE stay_id=? ORDER BY created_at DESC,id DESC",(r,n)->attachment(r),stayId);}
+ Optional<AttachmentFile> attachment(long id){return jdbc.query("SELECT * FROM dorm_stay_attachment WHERE id=?",(r,n)->new AttachmentFile(attachment(r),r.getString("stored_name")),id).stream().findFirst();}
+ int deleteAttachment(long id){return jdbc.update("DELETE FROM dorm_stay_attachment WHERE id=?",id);}
+ FeeRule feeRule(){return jdbc.queryForObject("SELECT * FROM dorm_fee_rule WHERE id=1",(r,n)->new FeeRule(r.getBigDecimal("water_price"),r.getBigDecimal("electric_price"),r.getBigDecimal("free_water"),r.getBigDecimal("free_electric"),r.getBoolean("enabled"),r.getString("operator_name"),r.getTimestamp("updated_at").toInstant()));}
+ void saveFeeRule(FeeRuleCommand c,String op){jdbc.update("UPDATE dorm_fee_rule SET water_price=?,electric_price=?,free_water=?,free_electric=?,enabled=?,operator_name=?,updated_at=CURRENT_TIMESTAMP WHERE id=1",c.waterPrice(),c.electricPrice(),c.freeWater(),c.freeElectric(),c.enabled(),op);}
+ List<FeeSource> feeSources(String month,String previous){return jdbc.query("SELECT r.id room_id,r.room_no,b.name building_name,c.water_end,c.electric_end,p.water_end previous_water,p.electric_end previous_electric FROM dorm_room r JOIN dorm_building b ON b.id=r.building_id JOIN dorm_meter_reading c ON c.room_id=r.id AND c.reading_month=? JOIN dorm_meter_reading p ON p.room_id=r.id AND p.reading_month=? WHERE r.livable=TRUE ORDER BY b.display_order,r.display_order,r.id",(r,n)->new FeeSource(r.getLong("room_id"),r.getString("building_name"),r.getString("room_no"),r.getBigDecimal("water_end"),r.getBigDecimal("electric_end"),r.getBigDecimal("previous_water"),r.getBigDecimal("previous_electric")),month,previous);}
+ void saveBill(FeeSource s,String month,FeeRule rule,BigDecimal waterUsage,BigDecimal electricUsage,BigDecimal waterAmount,BigDecimal electricAmount,String op){BigDecimal total=waterAmount.add(electricAmount);int n=jdbc.update("UPDATE dorm_fee_bill SET water_usage=?,electric_usage=?,water_price=?,electric_price=?,free_water=?,free_electric=?,water_amount=?,electric_amount=?,total_amount=?+adjustment,operator_name=?,updated_at=CURRENT_TIMESTAMP WHERE room_id=? AND billing_month=? AND status='DRAFT'",waterUsage,electricUsage,rule.waterPrice(),rule.electricPrice(),rule.freeWater(),rule.freeElectric(),waterAmount,electricAmount,total,op,s.roomId(),month);if(n==0&&!billExists(s.roomId(),month))jdbc.update("INSERT INTO dorm_fee_bill(room_id,billing_month,water_usage,electric_usage,water_price,electric_price,free_water,free_electric,water_amount,electric_amount,total_amount,operator_name) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",s.roomId(),month,waterUsage,electricUsage,rule.waterPrice(),rule.electricPrice(),rule.freeWater(),rule.freeElectric(),waterAmount,electricAmount,total,op);}
+ List<FeeBill> bills(String month){return jdbc.query("SELECT f.*,r.room_no,b.name building_name FROM dorm_fee_bill f JOIN dorm_room r ON r.id=f.room_id JOIN dorm_building b ON b.id=r.building_id WHERE f.billing_month=? ORDER BY b.display_order,r.display_order,r.id",(r,n)->bill(r),month);}
+ Optional<FeeBill> bill(long id){return jdbc.query("SELECT f.*,r.room_no,b.name building_name FROM dorm_fee_bill f JOIN dorm_room r ON r.id=f.room_id JOIN dorm_building b ON b.id=r.building_id WHERE f.id=?",(r,n)->bill(r),id).stream().findFirst();}
+ int updateBill(long id,FeeBillCommand c,String op){return jdbc.update("UPDATE dorm_fee_bill SET adjustment=?,total_amount=water_amount+electric_amount+?,remark=?,status=?,operator_name=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='DRAFT'",c.adjustment(),c.adjustment(),c.remark(),c.status(),op,id);}
+ private boolean billExists(long room,String month){Integer n=jdbc.queryForObject("SELECT COUNT(*) FROM dorm_fee_bill WHERE room_id=? AND billing_month=?",Integer.class,room,month);return n!=null&&n>0;}
+ private long insert(String sql,Object...args){KeyHolder h=new GeneratedKeyHolder();jdbc.update(c->{PreparedStatement p=c.prepareStatement(sql,new String[]{"id"});for(int i=0;i<args.length;i++)p.setObject(i+1,args[i]);return p;},h);return Objects.requireNonNull(h.getKey()).longValue();}
+ private static StayAttachment attachment(ResultSet r)throws SQLException{return new StayAttachment(r.getLong("id"),r.getLong("stay_id"),r.getString("attachment_type"),r.getString("original_name"),r.getString("content_type"),r.getLong("file_size"),r.getString("operator_name"),r.getTimestamp("created_at").toInstant());}
+ private static FeeBill bill(ResultSet r)throws SQLException{return new FeeBill(r.getLong("id"),r.getLong("room_id"),r.getString("building_name"),r.getString("room_no"),r.getString("billing_month"),r.getBigDecimal("water_usage"),r.getBigDecimal("electric_usage"),r.getBigDecimal("water_price"),r.getBigDecimal("electric_price"),r.getBigDecimal("free_water"),r.getBigDecimal("free_electric"),r.getBigDecimal("water_amount"),r.getBigDecimal("electric_amount"),r.getBigDecimal("adjustment"),r.getBigDecimal("total_amount"),r.getString("status"),r.getString("remark"),r.getString("operator_name"),r.getTimestamp("updated_at").toInstant());}
+ record AttachmentFile(StayAttachment metadata,String storedName){}
+ record FeeSource(long roomId,String buildingName,String roomNo,BigDecimal waterEnd,BigDecimal electricEnd,BigDecimal previousWater,BigDecimal previousElectric){}
+}

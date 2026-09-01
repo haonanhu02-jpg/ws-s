@@ -1,0 +1,11 @@
+package com.wansheng.visitor.dormitory;
+import com.fasterxml.jackson.databind.*; import java.time.*; import org.springframework.amqp.core.*; import org.springframework.amqp.rabbit.annotation.RabbitListener; import org.springframework.beans.factory.annotation.Value; import org.springframework.context.annotation.*; import org.springframework.stereotype.Component; import org.springframework.transaction.annotation.Transactional; import org.springframework.web.client.RestClient;
+@Component class DormitoryRegistrationConsumer{
+ private final ObjectMapper json;private final RestClient client;private final DormitoryRepository repo;private final String url,token;private final Clock clock=Clock.systemUTC();
+ DormitoryRegistrationConsumer(ObjectMapper j,RestClient.Builder b,DormitoryRepository r,@Value("${visitor.dormitory.registration-service-url}")String u,@Value("${visitor.dormitory.internal-token}")String t){json=j;client=b.build();repo=r;url=u;token=t;}
+@RabbitListener(queues="dormitory.visitor-registered")@Transactional void receive(String p)throws Exception{JsonNode e=json.readTree(p);String eid=e.path("eventId").asText(),vid=e.path("visitId").asText();if(eid.isBlank()||vid.isBlank())throw new IllegalArgumentException("invalid event");DormitoryView v=client.get().uri(url+"/internal/registrations/{id}/dormitory-view",vid).header("X-Internal-Token",token).retrieve().body(DormitoryView.class);repo.createIfAbsent(eid,new DormitoryRecord(v.visitId(),v.visitorName(),v.mobile(),v.hostName(),v.hostDepartment(),v.visitReason(),v.accommodationRequired(),v.hasVehicle(),v.plateNumber(),v.vehicleEnteringFactory(),false,null),clock.instant());}
+record DormitoryView(String visitId,String visitorName,String mobile,String hostName,String hostDepartment,String visitReason,boolean accommodationRequired,boolean hasVehicle,String plateNumber,boolean vehicleEnteringFactory){}
+}
+@Configuration class DormitoryMessagingConfiguration{
+ @Bean TopicExchange dormitoryVisitorExchange(){return new TopicExchange("visitor.events",true,false);}@Bean Queue dormitoryRegistrationQueue(){return new Queue("dormitory.visitor-registered",true);}@Bean Binding dormitoryRegistrationBinding(Queue dormitoryRegistrationQueue,TopicExchange dormitoryVisitorExchange){return BindingBuilder.bind(dormitoryRegistrationQueue).to(dormitoryVisitorExchange).with("visitor.registered");}
+}

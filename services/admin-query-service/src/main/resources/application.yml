@@ -1,0 +1,19 @@
+server.port: ${SERVER_PORT:8086}
+spring:
+  application.name: admin-query-service
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/visitor_database?currentSchema=admin_query_schema}
+    username: ${DB_USERNAME:visitor}
+    password: ${DB_PASSWORD:visitor}
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    username: ${RABBITMQ_USERNAME:visitor}
+    password: ${RABBITMQ_PASSWORD:visitor}
+management.endpoints.web.exposure.include: health,info
+visitor:
+  security.jwt-secret: ${VISITOR_JWT_SECRET:visitor-jwt-development-secret-change-before-production}
+  admin:
+    registration-url: ${REGISTRATION_SERVICE_URL:http://localhost:8082}
+    guard-url: ${GUARD_SERVICE_URL:http://localhost:8083}
+    dormitory-url: ${DORMITORY_SERVICE_URL:http://localhost:8084}
+    internal-token: ${VISITOR_INTERNAL_TOKEN:}

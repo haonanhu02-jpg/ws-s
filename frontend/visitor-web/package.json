@@ -1,0 +1,26 @@
+{
+  "name": "visitor-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vue-tsc -b && vite build",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@vitejs/plugin-vue": "^6.0.4",
+    "exceljs": "^4.4.0",
+    "qrcode": "^1.5.4",
+    "vite": "^8.2.2",
+    "vue": "^3.5.41",
+    "vue-router": "^4.6.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.0",
+    "@types/qrcode": "^1.5.6",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18",
+    "vue-tsc": "^3.1.5"
+  }
+}

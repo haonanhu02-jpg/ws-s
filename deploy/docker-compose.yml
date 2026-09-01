@@ -1,0 +1,179 @@
+name: visitor-platform
+
+x-backend-common: &backend-common
+  restart: unless-stopped
+  depends_on:
+    postgres:
+      condition: service_healthy
+    rabbitmq:
+      condition: service_healthy
+  environment: &backend-environment
+    DB_USERNAME: visitor
+    DB_PASSWORD: ${VISITOR_DB_PASSWORD:-visitor-dev-only}
+    RABBITMQ_HOST: rabbitmq
+    RABBITMQ_USERNAME: visitor
+    RABBITMQ_PASSWORD: ${VISITOR_RABBITMQ_PASSWORD:-visitor-dev-only}
+    VISITOR_JWT_SECRET: ${VISITOR_JWT_SECRET:-visitor-jwt-development-secret-change-before-production}
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: visitor_database
+      POSTGRES_USER: visitor
+      POSTGRES_PASSWORD: ${VISITOR_DB_PASSWORD:-visitor-dev-only}
+    volumes:
+      - visitor-postgres-v18:/var/lib/postgresql
+      - ./postgres/init-schemas.sql:/docker-entrypoint-initdb.d/001-init-schemas.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U visitor -d visitor_database"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: visitor
+      RABBITMQ_DEFAULT_PASS: ${VISITOR_RABBITMQ_PASSWORD:-visitor-dev-only}
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:8-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - visitor-redis:/data
+
+  auth-service:
+    build:
+      context: ..
+      dockerfile: deploy/backend.Dockerfile
+      args: { MODULE: services/auth-service }
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/visitor_database?currentSchema=auth_schema
+      DB_USERNAME: visitor
+      DB_PASSWORD: ${VISITOR_DB_PASSWORD:-visitor-dev-only}
+      VISITOR_BOOTSTRAP_USERNAME: ${VISITOR_BOOTSTRAP_USERNAME:-system-admin}
+      VISITOR_BOOTSTRAP_PASSWORD: ${VISITOR_BOOTSTRAP_PASSWORD:-change-me-in-env}
+      VISITOR_SECURITY_GUARD_PASSWORD: ${VISITOR_GUARD_PASSWORD:-guard-dev-only}
+      VISITOR_SECURITY_DORM_PASSWORD: ${VISITOR_DORM_PASSWORD:-dorm-dev-only}
+      VISITOR_SECURITY_ADMIN_PASSWORD: ${VISITOR_ADMIN_PASSWORD:-admin-dev-only}
+      VISITOR_JWT_SECRET: ${VISITOR_JWT_SECRET:-visitor-jwt-development-secret-change-before-production}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  registration-service:
+    <<: *backend-common
+    build:
+      context: ..
+      dockerfile: deploy/backend.Dockerfile
+      args: { MODULE: services/visitor-registration-service }
+    environment:
+      <<: *backend-environment
+      DB_URL: jdbc:postgresql://postgres:5432/visitor_database?currentSchema=registration_schema
+      VISITOR_INTERNAL_TOKEN: ${VISITOR_INTERNAL_TOKEN:-visitor-internal-dev-only}
+      PHONE_NOTIFICATION_MODE: UNDECIDED
+
+  guard-service:
+    <<: *backend-common
+    build:
+      context: ..
+      dockerfile: deploy/backend.Dockerfile
+      args: { MODULE: services/guard-record-service }
+    environment:
+      <<: *backend-environment
+      DB_URL: jdbc:postgresql://postgres:5432/visitor_database?currentSchema=guard_schema
+      REGISTRATION_SERVICE_URL: http://registration-service:8082
+      VISITOR_INTERNAL_TOKEN: ${VISITOR_INTERNAL_TOKEN:-visitor-internal-dev-only}
+      GUARD_VISIBILITY_MODE: ${GUARD_VISIBILITY_MODE:-UNDECIDED}
+      VISITOR_SECURITY_GUARD_PASSWORD: ${VISITOR_GUARD_PASSWORD:-guard-dev-only}
+      VISITOR_SECURITY_SYSTEM_PASSWORD: ${VISITOR_BOOTSTRAP_PASSWORD:-change-me-in-env}
+
+  dormitory-service:
+    <<: *backend-common
+    build:
+      context: ..
+      dockerfile: deploy/backend.Dockerfile
+      args: { MODULE: services/dormitory-service }
+    environment:
+      <<: *backend-environment
+      DB_URL: jdbc:postgresql://postgres:5432/visitor_database?currentSchema=dormitory_schema
+      REGISTRATION_SERVICE_URL: http://registration-service:8082
+      VISITOR_INTERNAL_TOKEN: ${VISITOR_INTERNAL_TOKEN:-visitor-internal-dev-only}
+      DORMITORY_SCOPE_MODE: ${DORMITORY_SCOPE_MODE:-UNDECIDED}
+      DORMITORY_ATTACHMENT_PATH: /data/dormitory-attachments
+      VISITOR_SECURITY_DORM_PASSWORD: ${VISITOR_DORM_PASSWORD:-dorm-dev-only}
+      VISITOR_SECURITY_SYSTEM_PASSWORD: ${VISITOR_BOOTSTRAP_PASSWORD:-change-me-in-env}
+    volumes:
+      - dormitory-attachments:/data/dormitory-attachments
+
+  oa-service:
+    <<: *backend-common
+    build:
+      context: ..
+      dockerfile: deploy/backend.Dockerfile
+      args: { MODULE: services/oa-integration-service }
+    environment:
+      <<: *backend-environment
+      DB_URL: jdbc:postgresql://postgres:5432/visitor_database?currentSchema=oa_integration_schema
+      SPRING_PROFILES_ACTIVE: ${OA_PROFILE:-oa-mock}
+      REGISTRATION_SERVICE_URL: http://registration-service:8082
+      VISITOR_INTERNAL_TOKEN: ${VISITOR_INTERNAL_TOKEN:-visitor-internal-dev-only}
+
+  admin-service:
+    <<: *backend-common
+    build:
+      context: ..
+      dockerfile: deploy/backend.Dockerfile
+      args: { MODULE: services/admin-query-service }
+    environment:
+      <<: *backend-environment
+      DB_URL: jdbc:postgresql://postgres:5432/visitor_database?currentSchema=admin_query_schema
+      REGISTRATION_SERVICE_URL: http://registration-service:8082
+      GUARD_SERVICE_URL: http://guard-service:8083
+      DORMITORY_SERVICE_URL: http://dormitory-service:8084
+      VISITOR_INTERNAL_TOKEN: ${VISITOR_INTERNAL_TOKEN:-visitor-internal-dev-only}
+      VISITOR_SECURITY_ADMIN_PASSWORD: ${VISITOR_ADMIN_PASSWORD:-admin-dev-only}
+      VISITOR_SECURITY_SYSTEM_PASSWORD: ${VISITOR_BOOTSTRAP_PASSWORD:-change-me-in-env}
+
+  api-gateway:
+    build:
+      context: ..
+      dockerfile: deploy/backend.Dockerfile
+      args: { MODULE: gateway/api-gateway }
+    depends_on:
+      - auth-service
+      - registration-service
+      - guard-service
+      - dormitory-service
+      - admin-service
+    environment:
+      AUTH_SERVICE_URL: http://auth-service:8081
+      REGISTRATION_SERVICE_URL: http://registration-service:8082
+      GUARD_SERVICE_URL: http://guard-service:8083
+      DORMITORY_SERVICE_URL: http://dormitory-service:8084
+      ADMIN_SERVICE_URL: http://admin-service:8086
+      VISITOR_SECURITY_GUARD_PASSWORD: ${VISITOR_GUARD_PASSWORD:-guard-dev-only}
+      VISITOR_SECURITY_DORM_PASSWORD: ${VISITOR_DORM_PASSWORD:-dorm-dev-only}
+      VISITOR_SECURITY_ADMIN_PASSWORD: ${VISITOR_ADMIN_PASSWORD:-admin-dev-only}
+      VISITOR_SECURITY_SYSTEM_PASSWORD: ${VISITOR_BOOTSTRAP_PASSWORD:-change-me-in-env}
+      VISITOR_JWT_SECRET: ${VISITOR_JWT_SECRET:-visitor-jwt-development-secret-change-before-production}
+
+  web:
+    build: ../frontend/visitor-web
+    depends_on:
+      - api-gateway
+    ports:
+      - "8088:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+
+volumes:
+  visitor-postgres-v18:
+  visitor-redis:
+  dormitory-attachments:

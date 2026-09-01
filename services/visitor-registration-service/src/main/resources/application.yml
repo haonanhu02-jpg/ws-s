@@ -1,0 +1,19 @@
+server:
+  port: ${SERVER_PORT:8082}
+spring:
+  application:
+    name: visitor-registration-service
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/visitor_database?currentSchema=registration_schema}
+    username: ${DB_USERNAME:visitor}
+    password: ${DB_PASSWORD:visitor}
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:visitor}
+    password: ${RABBITMQ_PASSWORD:visitor}
+visitor:
+  registration:
+    internal-token: ${VISITOR_INTERNAL_TOKEN:}
+    phone-notification-mode: ${PHONE_NOTIFICATION_MODE:UNDECIDED}
+management.endpoints.web.exposure.include: health,info

@@ -1,0 +1,38 @@
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      server:
+        webmvc:
+          routes:
+            - id: auth-service
+              uri: ${AUTH_SERVICE_URL:http://localhost:8081}
+              predicates:
+                - Path=/api/visitor/auth/**
+            - id: registration-service
+              uri: ${REGISTRATION_SERVICE_URL:http://localhost:8082}
+              predicates:
+                - Path=/api/visitor/registrations/**
+            - id: guard-service
+              uri: ${GUARD_SERVICE_URL:http://localhost:8083}
+              predicates:
+                - Path=/api/visitor/guard/**
+            - id: dormitory-service
+              uri: ${DORMITORY_SERVICE_URL:http://localhost:8084}
+              predicates:
+                - Path=/api/visitor/dormitory/**
+            - id: admin-service
+              uri: ${ADMIN_SERVICE_URL:http://localhost:8086}
+              predicates:
+                - Path=/api/visitor/admin/**
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+visitor.security.jwt-secret: ${VISITOR_JWT_SECRET:visitor-jwt-development-secret-change-before-production}

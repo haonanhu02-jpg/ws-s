@@ -1,0 +1,62 @@
+openapi: 3.1.0
+info:
+  title: Visitor Registration API
+  version: 0.2.0
+paths:
+  /api/visitor/registrations/configuration:
+    get:
+      summary: 获取登记表待确认规则配置
+      responses:
+        '200':
+          description: 当前配置
+  /api/visitor/registrations:
+    post:
+      summary: 提交来访申请
+      description: 已登记不代表获准通行；提交成功后事务性写入 OA/数据分发事件。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRegistrationRequest'
+      responses:
+        '201': { description: 登记成功 }
+        '400': { description: 字段或条件校验失败 }
+  /api/visitor/registrations/{visitId}/result:
+    get:
+      summary: 查询登记提交结果
+      parameters:
+        - in: path
+          name: visitId
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: 登记状态与 OA 状态 }
+        '404': { description: 记录不存在 }
+components:
+  schemas:
+    CreateRegistrationRequest:
+      type: object
+      required:
+        - visitorName
+        - mobile
+        - hostName
+        - hostDepartment
+        - visitReason
+        - accommodationRequired
+        - hasVehicle
+        - vehicleEnteringFactory
+      properties:
+        visitorName: { type: string, maxLength: 100 }
+        mobile: { type: string, maxLength: 30 }
+        hostName: { type: string, maxLength: 100 }
+        hostDepartment: { type: string, maxLength: 150 }
+        visitReason: { type: string, maxLength: 500 }
+        accommodationRequired: { type: boolean }
+        hasVehicle: { type: boolean }
+        plateNumber: { type: [string, 'null'], maxLength: 30 }
+        vehicleEnteringFactory: { type: boolean }
+        phoneNotificationRequested: { type: boolean, default: false }
+
+# Internal endpoints are intentionally excluded from the public gateway contract.
+# They require X-Internal-Token and expose separate guard, dormitory, OA and admin DTOs.
