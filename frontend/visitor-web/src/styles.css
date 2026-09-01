@@ -345,3 +345,133 @@ th:last-child,td:last-child{border-right:0}th{background:#f5f6f8;color:#4b5563;f
   .dormitory-layout .dorm-nav button{flex:0 0 auto;width:auto;min-width:max-content;min-height:38px;padding:7px 12px;border-left:0;border-bottom:3px solid transparent;border-radius:5px 5px 0 0}
   .dormitory-layout .dorm-content{width:100%;padding:16px}
 }
+
+/* ============================================================
+   全站统一品牌蓝设计覆盖层（#2b5ce6）
+   设计令牌提升为全局，管理端 / 登录 / 登记 / 二维码共享
+   ============================================================ */
+
+/* 1) 设计令牌：全局提升（含补齐 --d86-brand-soft-2） */
+:root {
+  --d86-brand: #2b5ce6;
+  --d86-brand-hover: #1e4cc4;
+  --d86-brand-soft: #eef3ff;
+  --d86-brand-soft-2: #e8efff;
+  --d86-brand-line: #c2d6ff;
+  --d86-bg: #f5f7fa;
+  --d86-surface: #fff;
+  --d86-surface-2: #fafbfd;
+  --d86-surface-3: #f2f5f9;
+  --d86-line: #e3e8f0;
+  --d86-line-soft: #eef1f6;
+  --d86-text: #16202f;
+  --d86-text-2: #57637a;
+  --d86-text-3: #8a94a6;
+  --d86-ok: #14875f;
+  --d86-ok-soft: #e7f7f0;
+  --d86-ok-line: #a8dfc5;
+  --d86-warn: #c4780a;
+  --d86-warn-soft: #fff6e8;
+  --d86-warn-line: #f2d5a2;
+  --d86-danger: #d33a3a;
+  --d86-danger-soft: #fdeeee;
+  --d86-danger-line: #f6c2c2;
+}
+
+/* 2) 全局底色与文字 */
+body { background: var(--d86-bg); color: var(--d86-text); }
+.layout, .workspace { background: var(--d86-bg); }
+.brand-mark { background: var(--d86-brand); color: #fff; }
+
+/* 3) 管理端侧边栏：白底 + 蓝色高亮左边条 */
+.layout > aside { background: var(--d86-surface); border-right: 1px solid var(--d86-line); }
+.layout > aside .brand { border-bottom-color: var(--d86-line-soft); }
+.layout > aside .brand-mark { background: var(--d86-brand); color: #fff; }
+.layout > aside h1 { color: var(--d86-text); }
+.layout > aside .brand-subtitle { color: var(--d86-text-3); }
+.nav-group-title { color: var(--d86-text-3); }
+.layout > aside nav a { color: var(--d86-text-2); border-left: 3px solid transparent; border-radius: 0 6px 6px 0; }
+.layout > aside nav a:hover { background: var(--d86-surface-3); color: var(--d86-text); }
+.layout > aside nav a.router-link-active { background: var(--d86-brand-soft); color: var(--d86-brand); border-left-color: var(--d86-brand); }
+.layout > aside .aside-user { border-top-color: var(--d86-line); }
+.layout > aside .aside-user small { color: var(--d86-text-3); }
+
+/* 4) 管理端顶栏 */
+.topbar { background: var(--d86-surface); border-bottom-color: var(--d86-line); }
+.topbar-path strong { color: var(--d86-text); }
+.topbar-path span { color: var(--d86-text-3); }
+.topbar-path b { color: var(--d86-text-2); }
+.user-avatar { background: var(--d86-brand-soft); color: var(--d86-brand); }
+.logout { border-color: var(--d86-line); color: var(--d86-text-2); }
+.logout:hover:not(:disabled) { background: var(--d86-surface-3); }
+
+/* 5) 卡片 / 统计 / 通知 */
+.eyebrow { color: var(--d86-brand); }
+.page-head h2 { color: var(--d86-text); }
+.card, .panel { border-color: var(--d86-line); box-shadow: 0 6px 22px rgba(23, 43, 99, .06); }
+.card strong { color: var(--d86-text); }
+.stat-card { border-top-color: var(--d86-brand); }
+.quick-links a { border-color: var(--d86-line); color: var(--d86-brand); }
+.quick-links a:hover { border-color: var(--d86-brand-line); background: var(--d86-brand-soft); }
+.notice-panel { background: var(--d86-brand-soft); color: var(--d86-brand); }
+
+/* 6) 表单控件 / 按钮 */
+input, select, textarea { border-color: var(--d86-line); color: var(--d86-text); }
+input:focus, select:focus, textarea:focus { border-color: var(--d86-brand); box-shadow: 0 0 0 3px rgba(43, 92, 230, .12); }
+button { background: var(--d86-brand); }
+button:hover:not(:disabled) { background: var(--d86-brand-hover); }
+.secondary-button, .stay-actions .secondary, .resource-setting button.secondary, .setting-beds button { border-color: var(--d86-line); background: var(--d86-surface); color: var(--d86-text-2); }
+
+/* 7) 表格 / 状态标签 / 通知 / 分页 / 抽屉 */
+.table-wrap { border-color: var(--d86-line); }
+th { background: var(--d86-surface-3); color: var(--d86-text-2); }
+td { border-color: var(--d86-line-soft); }
+tbody tr:nth-child(even) { background: var(--d86-surface-2); }
+tbody tr:hover { background: var(--d86-brand-soft); }
+.status-pill { background: var(--d86-surface-3); color: var(--d86-text-2); }
+.status-pill.approved { background: var(--d86-ok-soft); color: var(--d86-ok); }
+.status-pill.rejected, .status-pill.failed, .status-pill.disabled { background: var(--d86-danger-soft); color: var(--d86-danger); }
+.status-pill.processing { background: var(--d86-warn-soft); color: var(--d86-warn); }
+.notice-error { background: var(--d86-danger-soft); color: var(--d86-danger); }
+.notice-success { background: var(--d86-ok-soft); color: var(--d86-ok); }
+.pagination button { border-color: var(--d86-line); color: var(--d86-brand); }
+.link-button { color: var(--d86-brand); }
+.drawer-backdrop, .modal-backdrop { background: rgba(16, 24, 40, .48); }
+.detail-drawer, .modal-card { border-radius: 12px; }
+
+/* 8) 登录页 */
+.center-page { background: var(--d86-bg); }
+.login-panel { width: min(92vw, 440px); padding: 40px 38px 38px; border: 1px solid var(--d86-line); border-radius: 12px; box-shadow: 0 8px 30px rgba(23, 43, 99, .08); }
+.login-brand { color: var(--d86-text); }
+.login-brand .brand-mark { background: var(--d86-brand); color: #fff; }
+.login-brand small { color: var(--d86-text-3); }
+.login-panel h1 { color: var(--d86-text); }
+.login-subtitle { color: var(--d86-text-3); }
+.login-panel label > span { color: var(--d86-text-2); }
+.login-panel input { height: 52px; border-radius: 8px; }
+.login-panel > button { height: 52px; border-radius: 8px; background: var(--d86-brand); box-shadow: none; }
+.login-panel > button:hover:not(:disabled) { background: var(--d86-brand-hover); }
+.login-panel .visitor-entry-link { color: var(--d86-brand); }
+
+/* 9) 访客登记页 */
+.registration-page { background: var(--d86-bg); }
+.mobile-brand strong { color: var(--d86-text); }
+.registration-intro { border-bottom-color: var(--d86-line); }
+.registration-intro h1 { color: var(--d86-text); }
+.registration-intro p { color: var(--d86-text-2); }
+.form-section h2 span { background: var(--d86-brand-soft); color: var(--d86-brand); }
+.option-card { border-color: var(--d86-line); }
+.option-card.selected { border-color: var(--d86-brand); background: var(--d86-brand-soft); }
+.vehicle-fields { background: var(--d86-surface-3); }
+.privacy-note { background: var(--d86-surface-3); color: var(--d86-text-2); }
+.submit-registration { background: var(--d86-brand); }
+.submit-registration:hover:not(:disabled) { background: var(--d86-brand-hover); }
+.success-mark { background: var(--d86-brand); }
+.result-steps b { background: var(--d86-brand); }
+.result-panel .visit-id { background: var(--d86-surface-3); color: var(--d86-brand); border-color: var(--d86-brand-line); }
+
+/* 10) 二维码页 */
+.qr-page { background: var(--d86-bg); }
+.qr-card { border-color: var(--d86-line); }
+.qr-brand { color: var(--d86-text); }
+.qr-brand p { color: var(--d86-text-2); }
