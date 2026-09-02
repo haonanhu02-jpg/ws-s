@@ -523,3 +523,85 @@ tbody tr:hover { background: var(--d86-brand-soft); }
 .dormitory-layout .dorm-room.clean header small { color: #fff; }
 .dormitory-layout .dorm-room.clean .bed-list button { background: transparent; color: #fff; }
 .dormitory-layout .dorm-room.clean .bed-list button + button { border-top-color: rgba(255,255,255,.3); }
+
+/* ============================================================
+   管理端首页（Dashboard）重构：欢迎横幅 + 图标统计卡 + 快捷入口卡
+   仅用于 DashboardView，类名以 dash- 前缀隔离，不污染其他页面
+   ============================================================ */
+
+/* 1) 顶部欢迎横幅：白底卡片 + 左侧品牌蓝竖条 + 右侧首字母头像 */
+.dash-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 24px;
+  padding: 24px 28px;
+  background: var(--d86-surface);
+  border: 1px solid var(--d86-line);
+  border-left: 5px solid var(--d86-brand);
+  border-radius: 12px;
+  box-shadow: 0 6px 22px rgba(23, 43, 99, .06);
+}
+.dash-hero-text .eyebrow { margin: 0 0 6px; }
+.dash-hero-text h2 { margin: 0 0 6px; font-size: 26px; color: var(--d86-text); }
+.dash-hero-text .muted { margin: 0; color: var(--d86-text-3); }
+.dash-avatar {
+  width: 56px; height: 56px; flex: 0 0 auto;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  background: var(--d86-brand); color: #fff;
+  font-size: 22px; font-weight: 700;
+  box-shadow: 0 6px 16px rgba(43, 92, 230, .3);
+}
+
+/* 2) 统计卡片：图标 + 数字，hover 浮起 */
+.dash-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 18px; margin-top: 0; }
+.dash-stat {
+  display: flex; align-items: center; gap: 16px;
+  padding: 22px;
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+.dash-stat:hover { transform: translateY(-4px); box-shadow: 0 14px 30px rgba(23, 43, 99, .12); border-color: var(--d86-brand-line); }
+.dash-stat-icon {
+  width: 46px; height: 46px; flex: 0 0 auto;
+  display: grid; place-items: center;
+  border-radius: 12px;
+  background: var(--d86-brand-soft); color: var(--d86-brand);
+}
+.dash-stat-icon svg { width: 24px; height: 24px; }
+.dash-stat-body { display: grid; gap: 4px; min-width: 0; }
+.dash-stat-body span { color: var(--d86-text-2); font-size: 14px; }
+.dash-stat-body strong { font-size: 30px; line-height: 1.1; color: var(--d86-text); }
+
+/* 3) 快捷入口：图标 + 标题 + 说明 + 箭头卡片 */
+.dash-quick { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+.dash-quick-card {
+  display: flex; align-items: center; gap: 16px;
+  padding: 18px 20px;
+  background: var(--d86-surface);
+  border: 1px solid var(--d86-line);
+  border-radius: 12px;
+  color: var(--d86-text); text-decoration: none;
+  transition: border-color .18s ease, background .18s ease, transform .18s ease;
+}
+.dash-quick-card:hover { border-color: var(--d86-brand-line); background: var(--d86-brand-soft); transform: translateY(-2px); }
+.dash-quick-icon {
+  width: 42px; height: 42px; flex: 0 0 auto;
+  display: grid; place-items: center;
+  border-radius: 10px;
+  background: var(--d86-brand-soft); color: var(--d86-brand);
+}
+.dash-quick-icon svg { width: 22px; height: 22px; }
+.dash-quick-text { display: grid; gap: 2px; min-width: 0; flex: 1; }
+.dash-quick-text b { font-size: 15px; font-weight: 700; color: var(--d86-text); }
+.dash-quick-text small { font-size: 12px; color: var(--d86-text-3); }
+.dash-quick-arrow { margin-left: auto; color: var(--d86-brand); font-size: 18px; transition: transform .18s ease; }
+.dash-quick-card:hover .dash-quick-arrow { transform: translateX(4px); }
+
+@media (max-width: 640px) {
+  .dash-hero { padding: 20px; }
+  .dash-hero-text h2 { font-size: 22px; }
+  .dash-avatar { width: 46px; height: 46px; font-size: 18px; }
+  .dash-stat-body strong { font-size: 26px; }
+}
