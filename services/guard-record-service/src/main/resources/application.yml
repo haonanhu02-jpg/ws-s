@@ -13,6 +13,6 @@ management.endpoints.web.exposure.include: health,info
 visitor:
   security.jwt-secret: ${VISITOR_JWT_SECRET:visitor-jwt-development-secret-change-before-production}
   guard:
-    visibility-mode: ${GUARD_VISIBILITY_MODE:UNDECIDED}
+    visibility-mode: ${GUARD_VISIBILITY_MODE:IMMEDIATE}
     registration-service-url: ${REGISTRATION_SERVICE_URL:http://localhost:8082}
     internal-token: ${VISITOR_INTERNAL_TOKEN:}

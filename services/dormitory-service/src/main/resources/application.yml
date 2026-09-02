@@ -16,7 +16,7 @@ management.endpoints.web.exposure.include: health,info
 visitor:
   security.jwt-secret: ${VISITOR_JWT_SECRET:visitor-jwt-development-secret-change-before-production}
   dormitory:
-    scope-mode: ${DORMITORY_SCOPE_MODE:UNDECIDED}
+    scope-mode: ${DORMITORY_SCOPE_MODE:ACCOMMODATION_ONLY}
     registration-service-url: ${REGISTRATION_SERVICE_URL:http://localhost:8082}
     internal-token: ${VISITOR_INTERNAL_TOKEN:}
     attachment-path: ${DORMITORY_ATTACHMENT_PATH:./data/dormitory-attachments}

@@ -1,19 +1,38 @@
-# Design QA
+**Source visual truth**
 
-- Source visual truth: `D:\download\宿舍管理系统\8.6\样式预览.html` and its local styles.
-- Implementation: `http://127.0.0.1:8088/visitor/dormitory`.
-- Primary comparison viewport: 2048 × 953; additional checks: 1366 desktop and 390 mobile.
-- Captures: `qa-output/dormitory/0-8.6参考页面.png` through `qa-output/dormitory/11-统计总览-手机.png`.
+- `C:/Users/12778/AppData/Local/Temp/codex-clipboard-3ffdb7e9-2d93-4bce-b061-2674566108e4.png`
+- `C:/Users/12778/AppData/Local/Temp/codex-clipboard-edcff15c-5ef3-4294-b82b-2933cfb0c861.jpg`
+- `C:/Users/12778/AppData/Local/Temp/codex-clipboard-803a047a-0706-4e03-be60-562a8cfa8c57.jpg`
 
-## Coverage
+**Implementation**
 
-- Compared statistics, floor plan, warning board, stay ledger, utilities, history, and settings.
-- Verified group/site/building selectors and booking/resource dialogs.
-- Checked desktop/mobile overflow and collected browser console/page errors.
+- URL: `http://localhost:8088/visitor/dormitory`
+- Target viewport: desktop, approximately 1665 × 467 CSS pixels for the ledger reference.
+- State: dormitory account, 入住台账.
 
-## Result
+**Verification performed**
 
-- The complete dormitory module now uses the 8.6 visual system: compact white header, two-row region pills, white navigation, pale-blue active states, blue primary actions, bordered cards, compact tables, room/bed state colors, forms, dialogs, and responsive navigation.
-- Browser errors: none. Desktop overflow: none. Mobile document overflow: none; wide tables scroll inside their own containers.
+- Frontend production build passed.
+- Frontend test passed.
+- Dormitory backend clean verification passed (12 tests).
+- Current demo database contains six people and six stays covering booked, checked-in, and checked-out states.
+- Search inputs, status chips, ledger actions, and responsive layout are implemented in the live page.
 
-Final result: passed
+**Comparison status**
+
+- The source images were available and inspected.
+- The implementation was opened in the Codex in-app browser, but this session does not expose a browser screenshot/capture surface. A normalized side-by-side visual comparison and console inspection could not be produced.
+- Focused-region comparison is therefore unavailable for the header, ledger toolbar, table, and booking form.
+
+**Findings**
+
+- No code/build blockers remain.
+- Visual fidelity cannot be formally passed without a rendered implementation capture.
+
+**Implementation checklist**
+
+- Capture the live ledger at the reference viewport.
+- Compare header, search toolbar, table density, status chips, and modal form against the supplied references.
+- Address any visible P1/P2 drift before changing this result to passed.
+
+final result: blocked

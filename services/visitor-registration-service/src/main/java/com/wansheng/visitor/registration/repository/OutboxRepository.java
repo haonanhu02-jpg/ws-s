@@ -51,7 +51,7 @@ public class OutboxRepository {
     private OutboxEvent map(ResultSet rs, int rowNumber) throws SQLException {
         return new OutboxEvent(
                 rs.getLong("id"), rs.getString("event_id"), rs.getString("event_type"),
-                rs.getString("visit_id"), rs.getObject("occurred_at", Instant.class),
+                rs.getString("visit_id"), rs.getTimestamp("occurred_at").toInstant(),
                 rs.getInt("event_version"));
     }
 
@@ -59,4 +59,3 @@ public class OutboxRepository {
             long id, String eventId, String eventType, String visitId, Instant occurredAt, int version) {
     }
 }
-

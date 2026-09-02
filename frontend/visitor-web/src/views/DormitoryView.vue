@@ -75,6 +75,7 @@ const resourceModal = ref(false),
   resourceId = ref<number | null>(null),
   resourceForm = reactive<any>({});
 const personModal = ref(false),
+  ledgerSearch = ref(""),
   personSearch = ref(""),
   selectedPerson = ref<Person | null>(null),
   personHistory = ref<Stay[]>([]),
@@ -260,6 +261,10 @@ const filteredPeople = computed(() => {
         p.rankName,
       ].some((v) => v?.toLowerCase().includes(q)),
   );
+});
+const filteredStays = computed(() => {
+  const q = ledgerSearch.value.trim().toLowerCase();
+  return stays.value.filter((s) => !q || [s.person.name, s.person.department, s.person.centerName, s.bed.bedCode, statusLabel(s.status)].some((v) => v?.toLowerCase().includes(q)));
 });
 function duplicatePerson(p: Person) {
   return people.value.some(
@@ -1151,7 +1156,8 @@ onMounted(load);
           </div></template
         >
         <template v-else-if="!loading && active === 'ledger'"
-          ><h2>入住人员台账</h2>
+          ><div class="ledger-heading"><div><span class="section-kicker">住宿业务</span><h2>入住人员台账</h2><p>集中查看预订、在住与退宿人员，支持快速办理住宿业务。</p></div><div class="ledger-count"><b>{{ stays.length }}</b><span>全部记录</span></div></div>
+          <div class="ledger-toolbar"><label><span>搜索台账</span><input v-model.trim="ledgerSearch" placeholder="输入姓名、部门、床位或状态" /></label><div class="ledger-legend"><span><i class="dot booked"></i>已预订</span><span><i class="dot living"></i>已入住</span><span><i class="dot done"></i>已退宿</span></div></div>
           <div class="table-wrap">
             <table>
               <thead>
@@ -1167,12 +1173,12 @@ onMounted(load);
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="s in stays" :key="s.id">
+                <tr v-for="s in filteredStays" :key="s.id">
                   <td>{{ s.person.name }}</td>
                   <td>{{ s.person.department }}</td>
                   <td>{{ s.person.gender }}</td>
                   <td>{{ s.bed.bedCode }}</td>
-                  <td>{{ statusLabel(s.status) }}</td>
+                  <td><span :class="['ledger-status', s.status.toLowerCase()]">{{ statusLabel(s.status) }}</span></td>
                   <td>{{ s.plannedMoveIn }}</td>
                   <td>{{ s.plannedMoveOut || "-" }}</td>
                   <td class="stay-actions">
@@ -1214,19 +1220,16 @@ onMounted(load);
                     <button class="secondary" @click="openAttachments(s)">附件</button>
                   </td>
                 </tr>
-                <tr v-if="!stays.length">
+                <tr v-if="!filteredStays.length">
                   <td colspan="8" class="empty-cell">暂无住宿记录</td>
                 </tr>
               </tbody>
             </table>
           </div>
-          <div class="section-title subsection-head">
-            <h3>人员档案</h3>
+          <div class="section-title subsection-head people-head">
+            <div><span class="section-kicker">基础资料</span><h3>人员档案</h3><p>维护入住人员信息并查看完整住宿历史。</p></div>
             <div class="row-actions">
-              <input
-                v-model.trim="personSearch"
-                placeholder="搜索姓名、部门、中心或类别"
-              />
+              <label class="pretty-search"><span>搜索人员</span><input v-model.trim="personSearch" placeholder="姓名、部门、中心或类别" /></label>
               <button class="secondary-button" @click="downloadImportTemplate('people')">
                 下载模板
               </button>
