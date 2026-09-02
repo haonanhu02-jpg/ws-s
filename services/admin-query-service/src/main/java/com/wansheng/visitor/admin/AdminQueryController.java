@@ -1,5 +1,5 @@
 package com.wansheng.visitor.admin;
-import com.fasterxml.jackson.databind.*;import java.time.*;import java.util.*;import org.springframework.beans.factory.annotation.Value;import org.springframework.web.bind.annotation.*;import org.springframework.web.client.RestClient;
+import tools.jackson.databind.*;import java.time.*;import java.util.*;import org.springframework.beans.factory.annotation.Value;import org.springframework.web.bind.annotation.*;import org.springframework.web.client.RestClient;
 @RestController @RequestMapping("/api/visitor/admin")class AdminQueryController{
  private final RestClient client;private final String registration,guard,dorm,token;AdminQueryController(@Value("${visitor.admin.registration-url}")String r,@Value("${visitor.admin.guard-url}")String g,@Value("${visitor.admin.dormitory-url}")String d,@Value("${visitor.admin.internal-token}")String t){client=RestClient.builder().build();registration=r;guard=g;dorm=d;token=t;}
  private JsonNode get(String url){return client.get().uri(url).header("X-Internal-Token",token).retrieve().body(JsonNode.class);}

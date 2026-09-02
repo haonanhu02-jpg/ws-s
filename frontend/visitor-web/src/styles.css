@@ -350,6 +350,12 @@ th:last-child,td:last-child{border-right:0}th{background:#f5f6f8;color:#4b5563;f
 .dormitory-layout .region-sub{padding-left:0}
 @media(max-width:640px){.dormitory-layout .region-tabs{flex-direction:row}.dormitory-layout .region-primary,.dormitory-layout .region-sub{flex-wrap:nowrap}}
 
+/* Internal navigation stays legible on the dark application sidebar. */
+.layout:not(.dormitory-layout)>aside .nav-group-title{color:#9fb0c4}
+.layout:not(.dormitory-layout)>aside nav a{color:#cbd5e1}
+.layout:not(.dormitory-layout)>aside nav a:hover{background:rgba(255,255,255,.06);color:#fff}
+.layout:not(.dormitory-layout)>aside nav a.router-link-active{border-left-color:#62a2ff;background:rgba(74,137,231,.14);color:#75adff}
+
 /* 8.6 mobile layout: header and navigation become compact horizontal bands. */
 @media(max-width:640px){
   .dormitory-layout .dorm-head{display:flex;height:auto;min-height:0;align-items:flex-start;flex-wrap:wrap;gap:8px;padding:12px}
