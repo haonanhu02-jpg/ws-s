@@ -812,3 +812,26 @@ tbody tr:hover { background: var(--d86-brand-soft); }
 .stat-tone.green .dash-stat-body strong { color: #1f9d55; }
 .stat-tone.amber .dash-stat-icon { background: #fdf3dc; color: #c8860b; }
 .stat-tone.amber .dash-stat-body strong { color: #c8860b; }
+
+/* ============================================================
+   18) 收尾打磨：合并导出按钮、修「月份」换行、显眼保存抄表条
+   ============================================================ */
+.dormitory-layout .rp-field > span { white-space: nowrap; }
+.dormitory-layout .ledger-heading-right { display: flex; align-items: center; gap: 14px; flex-shrink: 0; }
+.dormitory-layout .ledger-heading-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.dormitory-layout .rp-save-bar { margin: -6px 0 16px; display: flex; justify-content: flex-end; }
+.dormitory-layout .rp-save {
+  display: inline-flex; align-items: center; gap: 8px;
+  height: 42px; padding: 0 22px;
+  border: 1px solid var(--d86-brand); border-radius: 10px;
+  background: var(--d86-brand); color: #fff;
+  font-size: 14px; font-weight: 600;
+  transition: background .15s ease, transform .15s ease, box-shadow .15s ease;
+}
+.dormitory-layout .rp-save:hover { background: var(--d86-brand-hover); transform: translateY(-1px); box-shadow: 0 8px 18px rgba(43, 92, 230, .25); }
+.dormitory-layout .rp-save svg { width: 16px; height: 16px; }
+@media (max-width: 720px) {
+  .dormitory-layout .ledger-heading-right { width: 100%; flex-direction: column-reverse; align-items: flex-start; }
+  .dormitory-layout .rp-save-bar { justify-content: stretch; }
+  .dormitory-layout .rp-save { width: 100%; justify-content: center; }
+}

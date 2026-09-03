@@ -1064,41 +1064,6 @@ onMounted(load);
         <p v-if="error" class="notice-error">{{ error }}</p>
         <p v-if="message" class="notice-success">{{ message }}</p>
         <p v-if="loading" class="muted">正在加载宿舍数据…</p>
-        <div
-          v-if="
-            !loading &&
-            (active === 'ledger' ||
-              active === 'archive' ||
-              active === 'reports')
-          "
-          class="export-actions"
-        >
-          <button
-            v-if="active === 'ledger'"
-            class="secondary-button"
-            @click="exportLedger"
-          >
-            导出入住台账</button
-          ><button
-            v-if="active === 'ledger'"
-            class="secondary-button"
-            @click="exportPeople"
-          >
-            导出人员档案</button
-          ><button
-            v-if="active === 'archive'"
-            class="secondary-button"
-            @click="exportHistory"
-          >
-            导出历史档案</button
-          ><button
-            v-if="active === 'reports'"
-            class="secondary-button"
-            @click="exportMeters"
-          >
-            导出水电抄表
-          </button>
-        </div>
         <template v-if="!loading && active === 'stats'"
           ><h3 class="stat-section-title">统计总览 · 卡片</h3>
           <div class="dorm-stats">
@@ -1197,7 +1162,7 @@ onMounted(load);
           </div></template
         >
         <template v-else-if="!loading && active === 'ledger'"
-          ><div class="ledger-heading"><div><span class="section-kicker">住宿业务</span><h2>入住人员台账</h2><p>集中查看预订、在住与退宿人员，支持快速办理住宿业务。</p></div><div class="ledger-count"><b>{{ stays.length }}</b><span>全部记录</span></div></div>
+          ><div class="ledger-heading"><div><span class="section-kicker">住宿业务</span><h2>入住人员台账</h2><p>集中查看预订、在住与退宿人员，支持快速办理住宿业务。</p></div><div class="ledger-heading-right"><div class="ledger-heading-actions"><button class="secondary-button" @click="exportLedger">导出入住台账</button><button class="secondary-button" @click="exportPeople">导出人员档案</button></div><div class="ledger-count"><b>{{ stays.length }}</b><span>全部记录</span></div></div></div>
           <div class="ledger-toolbar"><label><span>搜索台账</span><input v-model.trim="ledgerSearch" placeholder="输入姓名、部门、床位或状态" /></label><div class="ledger-legend"><span><i class="dot booked"></i>已预订</span><span><i class="dot living"></i>已入住</span><span><i class="dot done"></i>已退宿</span></div></div>
           <div class="table-wrap">
             <table>
@@ -1360,9 +1325,10 @@ onMounted(load);
             <div class="rp-actions">
               <label class="rp-field">月份<input v-model="meterMonth" type="month" @change="changeMeterMonth" /></label>
               <button class="secondary-button" @click="changeMeterMonth">确定</button>
-              <button @click="saveMeters">保存抄表</button>
+              <button class="secondary-button" @click="exportMeters">导出水电抄表</button>
             </div>
           </div>
+          <div class="rp-save-bar"><button class="rp-save" @click="saveMeters"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8"/><path d="M7 3v5h8"/></svg>保存抄表</button></div>
           <div class="rp-strip"><span class="dot"></span>提示：录入读数后请保存抄表，系统将自动生成水电费用台账。</div>
           <div
             v-for="node in shownBuildings"
@@ -1433,7 +1399,7 @@ onMounted(load);
           </section></template
         >
         <template v-else-if="!loading && active === 'archive'"
-          ><div class="section-hero"><div><span class="section-kicker">留档记录</span><h2>历史档案</h2><p>已结束住宿与住宿操作轨迹留档，便于追溯。</p></div></div>
+          ><div class="section-hero"><div><span class="section-kicker">留档记录</span><h2>历史档案</h2><p>已结束住宿与住宿操作轨迹留档，便于追溯。</p></div><button class="secondary-button" @click="exportHistory">导出历史档案</button></div>
           <h3 class="subsection-title">已结束住宿</h3>
           <div class="table-wrap">
             <table>
