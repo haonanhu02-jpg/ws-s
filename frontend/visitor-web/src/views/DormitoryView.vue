@@ -887,6 +887,14 @@ function exportMeters() {
     ]),
   );
 }
+function exportFees() {
+  return exportWorkbook(
+    `房间费用明细_${meterMonth.value}`,
+    "房间费用明细",
+    ["月份", "楼栋", "房号", "住宿人员", "用水量", "水价", "免费水量", "水费", "用电量", "电价", "免费电量", "电费", "调整金额", "合计", "状态", "备注", "操作人"],
+    feeBills.value.map((b) => [b.billingMonth, b.buildingName, b.roomNo, b.occupantNames || "空房", b.waterUsage, b.waterPrice, b.freeWater, b.waterAmount, b.electricUsage, b.electricPrice, b.freeElectric, b.electricAmount, b.adjustment, b.totalAmount, b.status === "CONFIRMED" ? "已确认" : "草稿", b.remark || "", b.operatorName]),
+  );
+}
 async function downloadImportTemplate(kind: "people" | "resources") {
   if (kind === "people")
     return exportWorkbook(
@@ -1393,9 +1401,9 @@ onMounted(load);
             </div>
           </div>
           <section class="fee-section">
-            <div class="section-title"><div><h3>费用结算</h3><small>按房间月度用量生成账单；已确认账单不可修改</small></div><div class="row-actions"><button class="secondary-button" @click="saveFeeRule">保存规则</button><button @click="generateFees">生成本月账单</button></div></div>
+            <div class="section-title"><div><h3>费用结算</h3><small>按房间月度用量生成账单；已确认账单不可修改</small></div><div class="row-actions"><button class="secondary-button" @click="exportFees">导出费用明细</button><button class="secondary-button" @click="saveFeeRule">保存规则</button><button @click="generateFees">生成本月账单</button></div></div>
             <div class="fee-rule-grid"><label>水价（元/吨）<input v-model.number="feeRule.waterPrice" type="number" min="0" step="0.0001"/></label><label>电价（元/度）<input v-model.number="feeRule.electricPrice" type="number" min="0" step="0.0001"/></label><label>每房免费水量<input v-model.number="feeRule.freeWater" type="number" min="0" step="0.01"/></label><label>每房免费电量<input v-model.number="feeRule.freeElectric" type="number" min="0" step="0.01"/></label><label class="choice"><input v-model="feeRule.enabled" type="checkbox"/> 启用结算规则</label></div>
-            <div class="table-wrap"><table><thead><tr><th>楼栋/房间</th><th>水量/水费</th><th>电量/电费</th><th>调整</th><th>合计</th><th>状态</th><th>操作</th></tr></thead><tbody><tr v-for="b in feeBills" :key="b.id"><td>{{b.buildingName}} / {{b.roomNo}}</td><td>{{b.waterUsage}} / ¥{{b.waterAmount}}</td><td>{{b.electricUsage}} / ¥{{b.electricAmount}}</td><td>¥{{b.adjustment}}</td><td><b>¥{{b.totalAmount}}</b></td><td>{{b.status==='CONFIRMED'?'已确认':'草稿'}}</td><td class="stay-actions"><button v-if="b.status==='DRAFT'" class="secondary" @click="updateFee(b)">调整</button><button v-if="b.status==='DRAFT'" @click="updateFee(b,true)">确认</button></td></tr><tr v-if="!feeBills.length"><td colspan="7" class="empty-cell">尚未生成本月账单；需要本月和上月抄表数据。</td></tr></tbody></table></div>
+            <div class="table-wrap"><table><thead><tr><th>楼栋/房间</th><th>住宿人员</th><th>水量/水费</th><th>电量/电费</th><th>调整</th><th>合计</th><th>状态</th><th>操作</th></tr></thead><tbody><tr v-for="b in feeBills" :key="b.id"><td>{{b.buildingName}} / {{b.roomNo}}</td><td>{{b.occupantNames||'空房'}}</td><td>{{b.waterUsage}} / ¥{{b.waterAmount}}</td><td>{{b.electricUsage}} / ¥{{b.electricAmount}}</td><td>¥{{b.adjustment}}</td><td><b>¥{{b.totalAmount}}</b></td><td>{{b.status==='CONFIRMED'?'已确认':'草稿'}}</td><td class="stay-actions"><button v-if="b.status==='DRAFT'" class="secondary" @click="updateFee(b)">调整</button><button v-if="b.status==='DRAFT'" @click="updateFee(b,true)">确认</button></td></tr><tr v-if="!feeBills.length"><td colspan="8" class="empty-cell">尚未生成本月账单；需要本月和上月抄表数据。</td></tr></tbody></table></div>
           </section></template
         >
         <template v-else-if="!loading && active === 'archive'"
