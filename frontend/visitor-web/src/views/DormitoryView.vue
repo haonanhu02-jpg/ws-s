@@ -17,6 +17,17 @@ import {
   type StayAudit,
   type StayAttachment,
 } from "../api/dormitory";
+const svgAttrs =
+  'viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
+const SETTING_ICONS: Record<string, string> = {
+  download: '<path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/>',
+  import:
+    '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 9l5-5 5 5"/><path d="M12 4v12"/>',
+  add: '<path d="M12 5v14M5 12h14"/>',
+};
+function settingIcon(k: string): string {
+  return `<svg ${svgAttrs}>` + (SETTING_ICONS[k] || "") + "</svg>";
+}
 const sections = [
   ["stats", "统计总览"],
   ["floorplan", "可视化平面图"],
@@ -1465,14 +1476,18 @@ onMounted(load);
           </div></template
         >
         <template v-else-if="!loading && active === 'settings'"
-          ><div class="section-title">
-            <h2>设置</h2>
-            <div class="row-actions">
-              <button class="secondary-button" @click="downloadImportTemplate('resources')">下载导入模板</button>
-              <button class="secondary-button" @click="chooseImport('resources')">批量导入房间床位</button>
-              <button @click="addBuilding">新增楼栋</button>
+          ><header class="settings-hero">
+            <div class="settings-hero-text">
+              <p class="eyebrow">RESOURCE SETTINGS</p>
+              <h2>设置</h2>
+              <p class="muted">维护楼栋、房间与床位资源，支持批量导入与下载模板。</p>
             </div>
-          </div>
+            <div class="settings-hero-actions">
+              <button class="secondary-button" @click="downloadImportTemplate('resources')"><span class="btn-ico" v-html="settingIcon('download')"></span>下载导入模板</button>
+              <button class="secondary-button" @click="chooseImport('resources')"><span class="btn-ico" v-html="settingIcon('import')"></span>批量导入房间床位</button>
+              <button @click="addBuilding"><span class="btn-ico" v-html="settingIcon('add')"></span>新增楼栋</button>
+            </div>
+          </header>
           <div
             v-for="node in buildings"
             :key="node.building.id"

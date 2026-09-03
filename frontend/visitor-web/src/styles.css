@@ -605,3 +605,51 @@ tbody tr:hover { background: var(--d86-brand-soft); }
   .dash-avatar { width: 46px; height: 46px; font-size: 18px; }
   .dash-stat-body strong { font-size: 26px; }
 }
+
+/* ============================================================
+   12) 宿舍「设置」页头部美化：白底卡片 + 品牌蓝竖条 + 图标按钮
+   仅作用于设置页，类名以 settings-hero 前缀隔离，不污染其他栏目
+   ============================================================ */
+.dormitory-layout .settings-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 24px;
+  padding: 22px 26px;
+  background: var(--d86-surface);
+  border: 1px solid var(--d86-line);
+  border-left: 4px solid var(--d86-brand);
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(39, 54, 80, .05);
+}
+.dormitory-layout .settings-hero-text { flex: 1; min-width: 0; }
+.dormitory-layout .settings-hero-text .eyebrow {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--d86-brand);
+}
+.dormitory-layout .settings-hero-text h2 {
+  margin: 0 0 6px;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--d86-text);
+}
+.dormitory-layout .settings-hero-text .muted { margin: 0; font-size: 13px; color: var(--d86-text-3); }
+.dormitory-layout .settings-hero-actions { display: flex; flex-wrap: wrap; gap: 12px; flex-shrink: 0; }
+.dormitory-layout .settings-hero-actions button { display: inline-flex; align-items: center; min-height: 44px; }
+.dormitory-layout .settings-hero-actions .btn-ico { display: inline-flex; width: 16px; height: 16px; margin-right: 8px; color: currentColor; }
+.dormitory-layout .settings-hero-actions .btn-ico svg { width: 16px; height: 16px; }
+.dormitory-layout .settings-hero-actions .secondary-button:hover {
+  border-color: var(--d86-brand-line);
+  background: var(--d86-brand-soft);
+  color: var(--d86-brand);
+}
+@media (max-width: 760px) {
+  .dormitory-layout .settings-hero { flex-direction: column; align-items: stretch; }
+  .dormitory-layout .settings-hero-actions { width: 100%; }
+  .dormitory-layout .settings-hero-actions button { width: 100%; justify-content: center; }
+}
