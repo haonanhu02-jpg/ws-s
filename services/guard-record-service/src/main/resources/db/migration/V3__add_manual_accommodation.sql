@@ -1,0 +1,2 @@
+ALTER TABLE guard_record
+  ADD COLUMN IF NOT EXISTS accommodation_required BOOLEAN NOT NULL DEFAULT FALSE;

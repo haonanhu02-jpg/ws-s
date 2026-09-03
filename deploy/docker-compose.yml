@@ -120,6 +120,7 @@ services:
       <<: *backend-environment
       DB_URL: jdbc:postgresql://postgres:5432/visitor_database?currentSchema=dormitory_schema
       REGISTRATION_SERVICE_URL: http://registration-service:8082
+      GUARD_SERVICE_URL: http://guard-service:8083
       VISITOR_INTERNAL_TOKEN: ${VISITOR_INTERNAL_TOKEN:-visitor-internal-dev-only}
       DORMITORY_SCOPE_MODE: ${DORMITORY_SCOPE_MODE:-ACCOMMODATION_ONLY}
       DORMITORY_ATTACHMENT_PATH: /data/dormitory-attachments

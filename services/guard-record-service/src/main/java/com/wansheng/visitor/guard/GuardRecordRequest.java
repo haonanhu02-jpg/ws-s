@@ -10,5 +10,6 @@ record GuardRecordRequest(
         @NotBlank @Pattern(regexp = "^[0-9+ -]{6,30}$") String mobile,
         @NotBlank @Size(max = 100) String hostName,
         @Size(max = 30) String plateNumber,
-        @NotNull Boolean vehicleEnteringFactory) {
+        @NotNull Boolean vehicleEnteringFactory,
+        @NotNull Boolean accommodationRequired) {
 }

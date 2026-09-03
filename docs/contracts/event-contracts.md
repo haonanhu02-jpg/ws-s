@@ -12,7 +12,10 @@
 }
 ```
 
-首版事件：`VISITOR_REGISTERED`、`OA_APPROVAL_UPDATED`、`VISITOR_ENTERED`、`VISITOR_EXITED`。
+首版事件：`VISITOR_REGISTERED`、`MANUAL_VISITOR_REGISTERED`、`OA_APPROVAL_UPDATED`、`VISITOR_ENTERED`、`VISITOR_EXITED`。
+
+`MANUAL_VISITOR_REGISTERED` 由门卫手工创建且选择住宿时产生，只携带统一最小信封；
+宿舍服务收到后通过内部最小权限视图读取住宿所需信息。
 
 `OA_APPROVAL_UPDATED` 仍只携带统一最小信封；门卫收到事件后使用 `visit_id` 调用 `guard-view` 获取最新只读 OA 状态，事件本身不传播审批详情。
 

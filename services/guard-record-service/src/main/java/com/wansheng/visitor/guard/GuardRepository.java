@@ -18,27 +18,29 @@ class GuardRepository {
     void createIfAbsent(String eventId, GuardRecord r, Instant now) {
         if (jdbc.queryForObject("SELECT COUNT(*) FROM guard_processed_event WHERE event_id=?", Integer.class, eventId) > 0) return;
         jdbc.update("INSERT INTO guard_record(visit_id,visitor_name,mobile,host_name,plate_number," +
-                "vehicle_entering_factory,oa_status,guard_status,created_at) " +
-                "VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT (visit_id) DO NOTHING",
+                "vehicle_entering_factory,accommodation_required,oa_status,guard_status,created_at) " +
+                "VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT (visit_id) DO NOTHING",
                 r.visitId(),r.visitorName(),r.mobile(),r.hostName(),r.plateNumber(),r.vehicleEnteringFactory(),
-                r.oaStatus(),GuardStatus.WAITING_ENTRY.name(),Timestamp.from(now));
+                r.accommodationRequired(),r.oaStatus(),GuardStatus.WAITING_ENTRY.name(),Timestamp.from(now));
         jdbc.update("INSERT INTO guard_processed_event(event_id,processed_at) VALUES(?,?) ON CONFLICT DO NOTHING", eventId, Timestamp.from(now));
     }
 
     void createManual(GuardRecord r, String operator, Instant now) {
         jdbc.update("INSERT INTO guard_record(visit_id,visitor_name,mobile,host_name,plate_number," +
-                        "vehicle_entering_factory,oa_status,guard_status,created_at) VALUES(?,?,?,?,?,?,?,?,?)",
+                        "vehicle_entering_factory,accommodation_required,oa_status,guard_status,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)",
                 r.visitId(), r.visitorName(), r.mobile(), r.hostName(), r.plateNumber(),
-                r.vehicleEnteringFactory(), r.oaStatus(), r.guardStatus().name(), Timestamp.from(now));
+                r.vehicleEnteringFactory(), r.accommodationRequired(), r.oaStatus(), r.guardStatus().name(), Timestamp.from(now));
         audit(r.visitId(), "MANUAL_CREATED", operator, now);
+        if (r.accommodationRequired()) addOutbox("MANUAL_VISITOR_REGISTERED", r.visitId(), now);
     }
 
     int updateDetails(String visitId, GuardRecordRequest request, String operator, Instant now) {
         int changed = jdbc.update("UPDATE guard_record SET visitor_name=?,mobile=?,host_name=?,plate_number=?," +
-                        "vehicle_entering_factory=?,version=version+1 WHERE visit_id=?",
+                        "vehicle_entering_factory=?,accommodation_required=?,version=version+1 WHERE visit_id=?",
                 request.visitorName().trim(), request.mobile().trim(), request.hostName().trim(),
-                normalize(request.plateNumber()), request.vehicleEnteringFactory(), visitId);
+                normalize(request.plateNumber()), request.vehicleEnteringFactory(), request.accommodationRequired(), visitId);
         if (changed == 1) audit(visitId, "DETAILS_UPDATED", operator, now);
+        if (changed == 1 && request.accommodationRequired()) addOutbox("MANUAL_VISITOR_REGISTERED", visitId, now);
         return changed;
     }
 
@@ -56,7 +58,7 @@ class GuardRepository {
         if (changed == 1) {
             audit(visitId, to.name(), operator, now);
             String eventType=to==GuardStatus.IN_FACTORY?"VISITOR_ENTERED":"VISITOR_EXITED";
-            jdbc.update("INSERT INTO guard_outbox(event_id,event_type,visit_id,occurred_at) VALUES(?,?,?,?)","EVENT-"+UUID.randomUUID().toString().replace("-","").toUpperCase(),eventType,visitId,Timestamp.from(now));
+            addOutbox(eventType, visitId, now);
         }
         return changed;
     }
@@ -70,10 +72,15 @@ class GuardRepository {
                 visitId, action, operator, Timestamp.from(now));
     }
 
+    private void addOutbox(String eventType, String visitId, Instant now) {
+        jdbc.update("INSERT INTO guard_outbox(event_id,event_type,visit_id,occurred_at) VALUES(?,?,?,?)",
+                "EVENT-"+UUID.randomUUID().toString().replace("-","").toUpperCase(),eventType,visitId,Timestamp.from(now));
+    }
+
     private static String normalize(String value) {
         return value == null || value.isBlank() ? null : value.trim();
     }
 
-    private GuardRecord map(ResultSet rs,int n)throws SQLException { return new GuardRecord(rs.getString("visit_id"),rs.getString("visitor_name"),rs.getString("mobile"),rs.getString("host_name"),rs.getString("plate_number"),rs.getBoolean("vehicle_entering_factory"),rs.getString("oa_status"),GuardStatus.valueOf(rs.getString("guard_status")),instant(rs,"entry_time"),instant(rs,"exit_time"),rs.getString("entry_operator"),rs.getString("exit_operator")); }
+    private GuardRecord map(ResultSet rs,int n)throws SQLException { return new GuardRecord(rs.getString("visit_id"),rs.getString("visitor_name"),rs.getString("mobile"),rs.getString("host_name"),rs.getString("plate_number"),rs.getBoolean("vehicle_entering_factory"),rs.getBoolean("accommodation_required"),rs.getString("oa_status"),GuardStatus.valueOf(rs.getString("guard_status")),instant(rs,"entry_time"),instant(rs,"exit_time"),rs.getString("entry_operator"),rs.getString("exit_operator")); }
     private static Instant instant(ResultSet rs,String c)throws SQLException { Timestamp t=rs.getTimestamp(c); return t==null?null:t.toInstant(); }
 }
