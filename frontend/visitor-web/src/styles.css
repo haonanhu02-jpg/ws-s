@@ -408,9 +408,9 @@ body { background: var(--d86-bg); color: var(--d86-text); }
 .layout > aside h1 { color: var(--d86-text); }
 .layout > aside .brand-subtitle { color: var(--d86-text-3); }
 .nav-group-title { color: #64748b; font-weight: 600; }
-.layout > aside nav a { color: #475569; border-left: 3px solid transparent; border-radius: 0 6px 6px 0; font-weight: 500; }
+.layout > aside nav a { color: var(--d86-text-2); border-left: 3px solid transparent; border-radius: 0 6px 6px 0; font-weight: 500; }
 .layout > aside nav a:hover { background: var(--d86-surface-3); color: var(--d86-text); }
-.layout > aside nav a.router-link-active { background: var(--d86-brand); color: #fff; border-left-color: var(--d86-brand-hover); box-shadow: 4px 0 12px rgba(43, 92, 230, .22); }
+.layout > aside nav a.router-link-active { background: var(--d86-brand-soft); color: var(--d86-brand); border-left-color: var(--d86-brand); font-weight: 600; }
 .layout > aside .aside-user { border-top-color: var(--d86-line); }
 .layout > aside .aside-user small { color: var(--d86-text-3); }
 
