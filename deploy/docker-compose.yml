@@ -2,6 +2,12 @@ name: visitor-platform
 
 x-backend-common: &backend-common
   restart: unless-stopped
+  healthcheck:
+    test: ["CMD-SHELL", "curl --fail --silent http://localhost:$${HEALTH_PORT}/actuator/health >/dev/null"]
+    interval: 5s
+    timeout: 3s
+    retries: 30
+    start_period: 20s
   depends_on:
     postgres:
       condition: service_healthy
@@ -49,6 +55,7 @@ services:
       - visitor-redis:/data
 
   auth-service:
+    restart: unless-stopped
     build:
       context: ..
       dockerfile: deploy/backend.Dockerfile
@@ -63,6 +70,13 @@ services:
       VISITOR_SECURITY_DORM_PASSWORD: ${VISITOR_DORM_PASSWORD:-11111111}
       VISITOR_SECURITY_ADMIN_PASSWORD: ${VISITOR_ADMIN_PASSWORD:-11111111}
       VISITOR_JWT_SECRET: ${VISITOR_JWT_SECRET:-visitor-jwt-development-secret-change-before-production}
+      HEALTH_PORT: 8081
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent http://localhost:8081/actuator/health >/dev/null"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 20s
     depends_on:
       postgres:
         condition: service_healthy
@@ -78,6 +92,7 @@ services:
       DB_URL: jdbc:postgresql://postgres:5432/visitor_database?currentSchema=registration_schema
       VISITOR_INTERNAL_TOKEN: ${VISITOR_INTERNAL_TOKEN:-visitor-internal-dev-only}
       PHONE_NOTIFICATION_MODE: UNDECIDED
+      HEALTH_PORT: 8082
 
   guard-service:
     <<: *backend-common
@@ -93,6 +108,7 @@ services:
       GUARD_VISIBILITY_MODE: ${GUARD_VISIBILITY_MODE:-IMMEDIATE}
       VISITOR_SECURITY_GUARD_PASSWORD: ${VISITOR_GUARD_PASSWORD:-11111111}
       VISITOR_SECURITY_SYSTEM_PASSWORD: ${VISITOR_BOOTSTRAP_PASSWORD:-11111111}
+      HEALTH_PORT: 8083
 
   dormitory-service:
     <<: *backend-common
@@ -109,6 +125,7 @@ services:
       DORMITORY_ATTACHMENT_PATH: /data/dormitory-attachments
       VISITOR_SECURITY_DORM_PASSWORD: ${VISITOR_DORM_PASSWORD:-11111111}
       VISITOR_SECURITY_SYSTEM_PASSWORD: ${VISITOR_BOOTSTRAP_PASSWORD:-11111111}
+      HEALTH_PORT: 8084
     volumes:
       - dormitory-attachments:/data/dormitory-attachments
 
@@ -124,6 +141,7 @@ services:
       SPRING_PROFILES_ACTIVE: ${OA_PROFILE:-oa-mock}
       REGISTRATION_SERVICE_URL: http://registration-service:8082
       VISITOR_INTERNAL_TOKEN: ${VISITOR_INTERNAL_TOKEN:-visitor-internal-dev-only}
+      HEALTH_PORT: 8085
 
   admin-service:
     <<: *backend-common
@@ -140,18 +158,25 @@ services:
       VISITOR_INTERNAL_TOKEN: ${VISITOR_INTERNAL_TOKEN:-visitor-internal-dev-only}
       VISITOR_SECURITY_ADMIN_PASSWORD: ${VISITOR_ADMIN_PASSWORD:-11111111}
       VISITOR_SECURITY_SYSTEM_PASSWORD: ${VISITOR_BOOTSTRAP_PASSWORD:-11111111}
+      HEALTH_PORT: 8086
 
   api-gateway:
+    restart: unless-stopped
     build:
       context: ..
       dockerfile: deploy/backend.Dockerfile
       args: { MODULE: gateway/api-gateway }
     depends_on:
-      - auth-service
-      - registration-service
-      - guard-service
-      - dormitory-service
-      - admin-service
+      auth-service:
+        condition: service_healthy
+      registration-service:
+        condition: service_healthy
+      guard-service:
+        condition: service_healthy
+      dormitory-service:
+        condition: service_healthy
+      admin-service:
+        condition: service_healthy
     environment:
       AUTH_SERVICE_URL: http://auth-service:8081
       REGISTRATION_SERVICE_URL: http://registration-service:8082
@@ -163,11 +188,19 @@ services:
       VISITOR_SECURITY_ADMIN_PASSWORD: ${VISITOR_ADMIN_PASSWORD:-11111111}
       VISITOR_SECURITY_SYSTEM_PASSWORD: ${VISITOR_BOOTSTRAP_PASSWORD:-11111111}
       VISITOR_JWT_SECRET: ${VISITOR_JWT_SECRET:-visitor-jwt-development-secret-change-before-production}
+      HEALTH_PORT: 8080
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent http://localhost:8080/actuator/health >/dev/null"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 20s
 
   web:
     build: ../frontend/visitor-web
     depends_on:
-      - api-gateway
+      api-gateway:
+        condition: service_healthy
     ports:
       - "8088:80"
     volumes:
