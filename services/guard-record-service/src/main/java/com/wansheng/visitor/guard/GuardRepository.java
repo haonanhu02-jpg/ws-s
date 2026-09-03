@@ -25,6 +25,23 @@ class GuardRepository {
         jdbc.update("INSERT INTO guard_processed_event(event_id,processed_at) VALUES(?,?) ON CONFLICT DO NOTHING", eventId, Timestamp.from(now));
     }
 
+    void createManual(GuardRecord r, String operator, Instant now) {
+        jdbc.update("INSERT INTO guard_record(visit_id,visitor_name,mobile,host_name,plate_number," +
+                        "vehicle_entering_factory,oa_status,guard_status,created_at) VALUES(?,?,?,?,?,?,?,?,?)",
+                r.visitId(), r.visitorName(), r.mobile(), r.hostName(), r.plateNumber(),
+                r.vehicleEnteringFactory(), r.oaStatus(), r.guardStatus().name(), Timestamp.from(now));
+        audit(r.visitId(), "MANUAL_CREATED", operator, now);
+    }
+
+    int updateDetails(String visitId, GuardRecordRequest request, String operator, Instant now) {
+        int changed = jdbc.update("UPDATE guard_record SET visitor_name=?,mobile=?,host_name=?,plate_number=?," +
+                        "vehicle_entering_factory=?,version=version+1 WHERE visit_id=?",
+                request.visitorName().trim(), request.mobile().trim(), request.hostName().trim(),
+                normalize(request.plateNumber()), request.vehicleEnteringFactory(), visitId);
+        if (changed == 1) audit(visitId, "DETAILS_UPDATED", operator, now);
+        return changed;
+    }
+
     Optional<GuardRecord> find(String visitId) { return jdbc.query("SELECT * FROM guard_record WHERE visit_id=?",this::map,visitId).stream().findFirst(); }
     List<GuardRecord> list(GuardStatus status) { return jdbc.query("SELECT * FROM guard_record WHERE guard_status=? ORDER BY created_at DESC",this::map,status.name()); }
     List<GuardRecord> listAll(){return jdbc.query("SELECT * FROM guard_record ORDER BY created_at DESC",this::map);}
@@ -37,7 +54,7 @@ class GuardRepository {
         int changed = jdbc.update("UPDATE guard_record SET guard_status=?,"+timeColumn+"=?,"+operatorColumn+"=?,version=version+1 WHERE visit_id=? AND guard_status=?",
                 to.name(),Timestamp.from(now),operator,visitId,from.name());
         if (changed == 1) {
-            jdbc.update("INSERT INTO guard_audit_log(visit_id,action,operator_name,operated_at) VALUES(?,?,?,?)",visitId,to.name(),operator,Timestamp.from(now));
+            audit(visitId, to.name(), operator, now);
             String eventType=to==GuardStatus.IN_FACTORY?"VISITOR_ENTERED":"VISITOR_EXITED";
             jdbc.update("INSERT INTO guard_outbox(event_id,event_type,visit_id,occurred_at) VALUES(?,?,?,?)","EVENT-"+UUID.randomUUID().toString().replace("-","").toUpperCase(),eventType,visitId,Timestamp.from(now));
         }
@@ -47,6 +64,15 @@ class GuardRepository {
     List<GuardOutboxEvent> unpublished(){return jdbc.query("SELECT id,event_id,event_type,visit_id,occurred_at FROM guard_outbox WHERE published_at IS NULL ORDER BY id LIMIT 100",(r,n)->new GuardOutboxEvent(r.getLong(1),r.getString(2),r.getString(3),r.getString(4),r.getTimestamp(5).toInstant()));}
     void published(long id,Instant at){jdbc.update("UPDATE guard_outbox SET published_at=? WHERE id=?",Timestamp.from(at),id);}
     record GuardOutboxEvent(long id,String eventId,String eventType,String visitId,Instant occurredAt){}
+
+    private void audit(String visitId, String action, String operator, Instant now) {
+        jdbc.update("INSERT INTO guard_audit_log(visit_id,action,operator_name,operated_at) VALUES(?,?,?,?)",
+                visitId, action, operator, Timestamp.from(now));
+    }
+
+    private static String normalize(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
+    }
 
     private GuardRecord map(ResultSet rs,int n)throws SQLException { return new GuardRecord(rs.getString("visit_id"),rs.getString("visitor_name"),rs.getString("mobile"),rs.getString("host_name"),rs.getString("plate_number"),rs.getBoolean("vehicle_entering_factory"),rs.getString("oa_status"),GuardStatus.valueOf(rs.getString("guard_status")),instant(rs,"entry_time"),instant(rs,"exit_time"),rs.getString("entry_operator"),rs.getString("exit_operator")); }
     private static Instant instant(ResultSet rs,String c)throws SQLException { Timestamp t=rs.getTimestamp(c); return t==null?null:t.toInstant(); }
