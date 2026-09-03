@@ -304,7 +304,7 @@ th:last-child,td:last-child{border-right:0}th{background:#f5f6f8;color:#4b5563;f
 .dormitory-layout .region-primary,.dormitory-layout .region-sub{align-self:flex-start}
 .dormitory-layout .dorm-nav{position:static;top:auto;height:auto;min-height:calc(100vh - 56px)}
 .dormitory-layout .dorm-nav button{border-color:transparent;background:var(--d86-surface);color:var(--d86-text-2)}
-.dormitory-layout .dorm-nav button:hover{border-color:transparent;background:var(--d86-surface-3);color:var(--d86-text)}
+.dormitory-layout .dorm-nav button:hover{border-color:transparent;border-left-color:var(--d86-brand);background:var(--d86-brand-soft);color:var(--d86-brand)}
 .dormitory-layout .dorm-nav button.active{border-color:transparent;border-left-color:var(--d86-brand);background:var(--d86-brand-soft);color:var(--d86-brand)}
 .dormitory-layout .region-tabs button.active{border-color:var(--d86-brand);background:var(--d86-brand);color:#fff}
 .dormitory-layout .region-sub button.active{border-color:var(--d86-brand-hover);background:var(--d86-brand-hover);color:#fff}
@@ -836,3 +836,4 @@ tbody tr:hover { background: var(--d86-brand-soft); }
   .dormitory-layout .rp-save-bar { justify-content: stretch; }
   .dormitory-layout .rp-save { width: 100%; justify-content: center; }
 }
+
