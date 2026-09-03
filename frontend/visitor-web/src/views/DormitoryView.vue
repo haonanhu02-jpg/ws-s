@@ -253,6 +253,33 @@ const alerts = computed(() => ({
       s.plannedMoveOut <= new Date().toISOString().slice(0, 10),
   ),
 }));
+type RoomState = "public" | "clean" | "live" | "book" | "ok";
+function roomState(room: Room): RoomState {
+  if (!room.livable) return "public";
+  if (room.cleaningRequired) return "clean";
+  const bedStays = room.beds.map((b) => stayByBed.value[b.id]).filter(Boolean);
+  if (bedStays.some((s) => s.status === "CHECKED_IN")) return "live";
+  if (bedStays.some((s) => s.status === "BOOKED")) return "book";
+  return "ok";
+}
+const ROOM_STATE_LABEL: Record<RoomState, string> = {
+  public: "公共区域",
+  clean: "待打扫",
+  live: "已入住",
+  book: "已预订",
+  ok: "可入住",
+};
+const statCards = computed(() => [
+  { label: "房间总数", value: overview.value.rooms, icon: '<path d="M3 21h18"/><path d="M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16"/>', tone: "blue" },
+  { label: "床位总数", value: overview.value.beds, icon: '<path d="M3 18v-6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6"/><path d="M3 14h18"/><path d="M6 10V7M18 10V7"/>', tone: "cyan" },
+  { label: "总入住率", value: overview.value.rate, icon: '<path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/>', tone: "green" },
+  { label: "男性人数", value: overview.value.male, icon: '<circle cx="10" cy="14" r="5"/><path d="M13 11l8-8"/><path d="M18 3h3v3"/>', tone: "indigo" },
+  { label: "女性人数", value: overview.value.female, icon: '<circle cx="12" cy="8" r="5"/><path d="M12 13v8M8 17h8"/>', tone: "pink" },
+  { label: "已预订人数", value: overview.value.booked, icon: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>', tone: "amber" },
+]);
+function statIcon(icon: string): string {
+  return `<svg ${svgAttrs}>${icon}</svg>`;
+}
 const historyStays = computed(() =>
   stays.value.filter(
     (s) => s.status === "CHECKED_OUT" || s.status === "CANCELLED",
@@ -1075,12 +1102,10 @@ onMounted(load);
         <template v-if="!loading && active === 'stats'"
           ><h3 class="stat-section-title">统计总览 · 卡片</h3>
           <div class="dorm-stats">
-            <article><b>{{ overview.rooms }}</b><span>房间总数</span></article>
-            <article><b>{{ overview.beds }}</b><span>床位总数</span></article>
-            <article><b>{{ overview.rate }}</b><span>总入住率</span></article>
-            <article><b>{{ overview.male }}</b><span>男性人数</span></article>
-            <article><b>{{ overview.female }}</b><span>女性人数</span></article>
-            <article><b>{{ overview.booked }}</b><span>已预订人数</span></article>
+            <article v-for="c in statCards" :key="c.label" :class="['stat-tone', c.tone]">
+              <span class="stat-ico" v-html="statIcon(c.icon)"></span>
+              <div class="stat-body"><b>{{ c.value }}</b><span>{{ c.label }}</span></div>
+            </article>
           </div>
           <h3 class="stat-section-title">统计总览 · 表格（含淡蓝合计行）</h3>
           <div class="statistics-grid">
@@ -1100,57 +1125,62 @@ onMounted(load);
           </div></template
         >
         <template v-else-if="!loading && active === 'floorplan'"
-          ><h2>可视化平面图</h2>
-          <div
-            v-for="node in shownBuildings"
-            :key="node.building.id"
-            class="building-block"
-          >
-            <h3>
-              {{ node.building.name }}
-              <small>{{ node.building.regionName }}</small>
-            </h3>
-            <div
-              v-for="floor in [...new Set(node.rooms.map((r) => r.floorNo))]"
-              :key="floor"
-              class="floor-block"
-            >
-              <b>{{ floor }}F</b>
-              <div class="room-grid">
-                <article
-                  v-for="room in node.rooms.filter((r) => r.floorNo === floor)"
-                  :key="room.id"
-                  :class="[
-                    'dorm-room',
-                    { public: !room.livable, clean: room.cleaningRequired },
-                  ]"
-                >
-                  <header>
-                    <strong>{{ room.roomNo }}</strong
-                    ><small>{{ room.facing }} {{ room.roomType }}</small>
-                  </header>
-                  <div v-if="room.livable" class="bed-list">
-                    <button
-                      v-for="bed in room.beds"
-                      :key="bed.id"
-                      :class="{
-                        occupied: stayByBed[bed.id],
-                        booked: stayByBed[bed.id]?.status === 'BOOKED',
-                      }"
-                      @click="openBed(room, bed)"
-                    >
-                      <span>{{ bed.label }}</span
-                      ><b>{{ stayByBed[bed.id]?.person.name || "空" }}</b>
-                    </button>
-                  </div>
-                  <p v-else>公共区域</p>
-                </article>
+          ><div class="fp-head">
+            <div class="fp-compass">
+              <svg class="fp-rose" viewBox="0 0 60 60" aria-hidden="true">
+                <circle cx="30" cy="30" r="27" fill="#fafbfd" stroke="#16202f" stroke-width="2" />
+                <circle cx="30" cy="30" r="22" fill="none" stroke="#e3e8f0" />
+                <text x="30" y="13" text-anchor="middle" font-size="10" font-weight="700" fill="#c0392b">N</text>
+                <text x="52" y="33" text-anchor="middle" font-size="9" font-weight="700" fill="#16202f">E</text>
+                <text x="30" y="55" text-anchor="middle" font-size="9" font-weight="700" fill="#16202f">S</text>
+                <text x="8" y="33" text-anchor="middle" font-size="9" font-weight="700" fill="#16202f">W</text>
+                <polygon points="30,30 50,26 50,34" fill="#e53935" />
+                <polygon points="30,30 10,28 10,32" fill="#16202f" opacity=".55" />
+                <circle cx="30" cy="30" r="3" fill="#16202f" />
+                <circle cx="30" cy="30" r="1.2" fill="#fff" />
+              </svg>
+              <div class="fp-compass-text"
+                ><b>上北下南 · 左西右东</b
+                ><small>颜色块代表房间状态 · 点击床位可办理</small></div
+              >
+            </div>
+            <div class="fp-legend">
+              <span>图例</span><i class="fp-sw ok"></i>可入住<i class="fp-sw book"></i>已预订<i class="fp-sw live"></i>已入住<i class="fp-sw clean"></i>待打扫<i class="fp-sw public"></i>公共区域
+            </div>
+          </div>
+          <div v-for="node in shownBuildings" :key="node.building.id" class="fp-building">
+            <header class="fp-building-head"><h3>{{ node.building.name }}<small>{{ node.building.regionName }}</small></h3></header>
+            <div v-for="floor in [...new Set(node.rooms.map((r) => r.floorNo))]" :key="floor" class="fp-floor">
+              <b class="fp-floor-label">{{ floor }}F</b>
+              <div class="fp-board">
+                <span class="fp-axis north">↑ 北 · 标间</span>
+                <div class="fp-row">
+                  <div class="fp-stair"><div class="fp-stair-arrows">↑↓</div><div>楼梯</div></div>
+                  <article v-for="room in node.rooms.filter((r) => r.floorNo === floor && r.roomType.includes('标间'))" :key="room.id" :class="['fp-room', roomState(room)]">
+                    <header><strong>{{ room.roomNo }}</strong><small>{{ room.roomType }} · {{ ROOM_STATE_LABEL[roomState(room)] }}</small></header>
+                    <div v-if="room.livable" class="fp-beds">
+                      <button v-for="bed in room.beds" :key="bed.id" :class="{ occupied: stayByBed[bed.id], booked: stayByBed[bed.id]?.status === 'BOOKED' }" @click="openBed(room, bed)"><span>{{ bed.label }}</span><b>{{ stayByBed[bed.id]?.person.name || "空" }}</b></button>
+                    </div>
+                    <p v-else>公共区域</p>
+                  </article>
+                </div>
+                <div class="fp-corridor">过 道</div>
+                <div class="fp-row">
+                  <article v-for="room in node.rooms.filter((r) => r.floorNo === floor && !r.roomType.includes('标间'))" :key="room.id" :class="['fp-room', roomState(room)]">
+                    <header><strong>{{ room.roomNo }}</strong><small>{{ room.roomType }} · {{ ROOM_STATE_LABEL[roomState(room)] }}</small></header>
+                    <div v-if="room.livable" class="fp-beds">
+                      <button v-for="bed in room.beds" :key="bed.id" :class="{ occupied: stayByBed[bed.id], booked: stayByBed[bed.id]?.status === 'BOOKED' }" @click="openBed(room, bed)"><span>{{ bed.label }}</span><b>{{ stayByBed[bed.id]?.person.name || "空" }}</b></button>
+                    </div>
+                    <p v-else>公共区域</p>
+                  </article>
+                </div>
+                <span class="fp-axis south">↓ 南 · 单间</span>
               </div>
             </div>
           </div></template
         >
         <template v-else-if="!loading && active === 'dashboard'"
-          ><h2>预警看板</h2>
+          ><div class="section-hero"><div><span class="section-kicker">实时预警</span><h2>预警看板</h2><p>待打扫房间与退房提醒集中展示，请及时处理。</p></div></div>
           <div class="warning-columns">
             <article>
               <h3>待打扫（{{ alerts.clean.length }}）</h3>
@@ -1322,24 +1352,18 @@ onMounted(load);
           </p></template
         >
         <template v-else-if="!loading && active === 'reports'"
-          ><div class="section-title">
-            <div>
-              <h2>水电报表</h2>
-              <small>房间单表模式；用量=本月末读数-上月末读数</small>
+          ><div class="rp-head">
+            <div class="rp-title">
+              <span class="rp-info">i</span>
+              <div><h2>月度抄表录入（{{ meterMonth }}）</h2><small>房间单表模式 · 用量 = 本月末读数 − 上月末读数</small></div>
             </div>
-            <button class="secondary-button" @click="saveMeters">
-              保存抄表
-            </button>
+            <div class="rp-actions">
+              <label class="rp-field">月份<input v-model="meterMonth" type="month" @change="changeMeterMonth" /></label>
+              <button class="secondary-button" @click="changeMeterMonth">确定</button>
+              <button @click="saveMeters">保存抄表</button>
+            </div>
           </div>
-          <div class="meter-toolbar">
-            <label
-              >抄表月份
-              <input
-                v-model="meterMonth"
-                type="month"
-                @change="changeMeterMonth"
-            /></label>
-          </div>
+          <div class="rp-strip"><span class="dot"></span>提示：录入读数后请保存抄表，系统将自动生成水电费用台账。</div>
           <div
             v-for="node in shownBuildings"
             :key="node.building.id"
@@ -1409,7 +1433,7 @@ onMounted(load);
           </section></template
         >
         <template v-else-if="!loading && active === 'archive'"
-          ><h2>历史档案</h2>
+          ><div class="section-hero"><div><span class="section-kicker">留档记录</span><h2>历史档案</h2><p>已结束住宿与住宿操作轨迹留档，便于追溯。</p></div></div>
           <h3 class="subsection-title">已结束住宿</h3>
           <div class="table-wrap">
             <table>

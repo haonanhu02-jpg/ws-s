@@ -653,3 +653,162 @@ tbody tr:hover { background: var(--d86-brand-soft); }
   .dormitory-layout .settings-hero-actions { width: 100%; }
   .dormitory-layout .settings-hero-actions button { width: 100%; justify-content: center; }
 }
+
+/* ============================================================
+   13) 宿舍「可视化平面图」重构：指南针 + 图例 + 空间布局 + 5 色状态
+   类名以 fp- 前缀隔离
+   ============================================================ */
+.dormitory-layout .fp-head { display: flex; flex-wrap: wrap; gap: 14px; align-items: stretch; margin-bottom: 18px; }
+.dormitory-layout .fp-compass {
+  display: flex; align-items: center; gap: 14px; flex: 1 1 280px;
+  padding: 12px 16px; background: var(--d86-surface);
+  border: 1px solid var(--d86-line); border-radius: 10px; box-shadow: 0 2px 10px rgba(23, 43, 99, .05);
+}
+.dormitory-layout .fp-rose { width: 56px; height: 56px; flex: 0 0 auto; }
+.dormitory-layout .fp-compass-text { display: grid; gap: 2px; }
+.dormitory-layout .fp-compass-text b { font-size: 14px; color: var(--d86-text); }
+.dormitory-layout .fp-compass-text small { font-size: 12px; color: var(--d86-text-3); }
+.dormitory-layout .fp-legend {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px; flex: 2 1 420px;
+  padding: 12px 16px; background: var(--d86-surface);
+  border: 1px solid var(--d86-line); border-radius: 10px; font-size: 12px; color: var(--d86-text-2);
+}
+.dormitory-layout .fp-legend > span { font-weight: 600; color: var(--d86-text-3); margin-right: 2px; }
+.dormitory-layout .fp-sw { width: 14px; height: 14px; border-radius: 4px; display: inline-block; border: 1px solid transparent; }
+.dormitory-layout .fp-sw.ok     { background: #e8f5e9; border-color: #c8e6c9; }
+.dormitory-layout .fp-sw.book   { background: #fff8e1; border-color: #ffe082; }
+.dormitory-layout .fp-sw.live   { background: #e3f2fd; border-color: #bbdefb; }
+.dormitory-layout .fp-sw.clean  { background: #fff3e0; border-color: #ffcc80; }
+.dormitory-layout .fp-sw.public { background: #f3e5f5; border-color: #e1bee7; }
+
+.dormitory-layout .fp-building { margin-bottom: 20px; }
+.dormitory-layout .fp-building-head h3 { margin: 0 0 10px; font-size: 17px; font-weight: 700; color: var(--d86-text); display: flex; align-items: baseline; gap: 8px; }
+.dormitory-layout .fp-building-head h3 small { font-size: 12px; font-weight: 400; color: var(--d86-text-3); }
+.dormitory-layout .fp-floor { margin-bottom: 16px; }
+.dormitory-layout .fp-floor-label { display: inline-block; margin-bottom: 8px; padding: 2px 10px; background: var(--d86-brand-soft); color: var(--d86-brand); border-radius: 6px; font-size: 12px; font-weight: 700; }
+.dormitory-layout .fp-board { display: flex; flex-direction: column; gap: 8px; padding: 14px; background: var(--d86-bg); border: 1px solid var(--d86-line); border-radius: 12px; }
+.dormitory-layout .fp-axis { display: grid; place-items: center; padding: 5px; background: #e8eef9; color: var(--d86-brand); border-radius: 6px; font-size: 12px; font-weight: 700; }
+.dormitory-layout .fp-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 8px; }
+.dormitory-layout .fp-stair { display: grid; place-items: center; align-content: center; gap: 2px; min-height: 72px; border-radius: 8px; background: #f3e5f5; border: 1px solid #e1bee7; color: #6a1b9a; font-size: 12px; font-weight: 600; }
+.dormitory-layout .fp-stair-arrows { font-size: 18px; line-height: 1; }
+.dormitory-layout .fp-corridor { display: grid; place-items: center; height: 28px; background: repeating-linear-gradient(135deg, #f0f2f7 0 8px, #fff 8px 16px); color: var(--d86-text-3); border-radius: 4px; font-size: 12px; font-weight: 500; }
+
+.dormitory-layout .fp-room { display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--d86-line); border-radius: 8px; background: var(--d86-surface); transition: transform .15s ease, box-shadow .15s ease; }
+.dormitory-layout .fp-room:hover { transform: translateY(-2px); box-shadow: 0 8px 18px rgba(23, 43, 99, .12); }
+.dormitory-layout .fp-room > header { padding: 6px 8px 5px; display: flex; flex-direction: column; gap: 1px; line-height: 1.3; }
+.dormitory-layout .fp-room > header strong { font-size: 16px; font-weight: 700; }
+.dormitory-layout .fp-room > header small { font-size: 10px; opacity: .8; }
+.dormitory-layout .fp-room > p { margin: 0; padding: 8px; font-size: 12px; }
+.dormitory-layout .fp-room.ok     { background: #e8f5e9; border-color: #c8e6c9; }
+.dormitory-layout .fp-room.book   { background: #fff8e1; border-color: #ffe082; }
+.dormitory-layout .fp-room.live   { background: #e3f2fd; border-color: #bbdefb; }
+.dormitory-layout .fp-room.clean  { background: #fff3e0; border-color: #ffcc80; }
+.dormitory-layout .fp-room.public { background: #f3e5f5; border-color: #e1bee7; }
+.dormitory-layout .fp-room.ok     > header strong { color: #2e7d32; }
+.dormitory-layout .fp-room.book   > header strong { color: #b26a00; }
+.dormitory-layout .fp-room.live   > header strong { color: #1565c0; }
+.dormitory-layout .fp-room.clean  > header strong { color: #c2410c; }
+.dormitory-layout .fp-room.public > header strong { color: #6a1b9a; }
+.dormitory-layout .fp-room.ok     > header small { color: #2e7d32; }
+.dormitory-layout .fp-room.book   > header small { color: #b26a00; }
+.dormitory-layout .fp-room.live   > header small { color: #1565c0; }
+.dormitory-layout .fp-room.clean  > header small { color: #c2410c; }
+.dormitory-layout .fp-room.public > header small { color: #6a1b9a; }
+.dormitory-layout .fp-beds { display: flex; flex-direction: column; }
+.dormitory-layout .fp-beds button {
+  display: flex; justify-content: space-between; align-items: center; gap: 6px;
+  padding: 4px 8px; min-height: auto; border: 0; border-radius: 0;
+  background: rgba(255, 255, 255, .55); color: inherit; box-shadow: none;
+  font-size: 12px; font-weight: 500; cursor: pointer;
+  border-top: 1px dashed rgba(0, 0, 0, .08);
+}
+.dormitory-layout .fp-beds button:first-child { border-top: 0; }
+.dormitory-layout .fp-beds button:hover { background: rgba(255, 255, 255, .92); }
+.dormitory-layout .fp-beds button b { font-weight: 600; }
+.dormitory-layout .fp-beds button.occupied b { color: #1565c0; }
+.dormitory-layout .fp-beds button.booked b { color: #b26a00; }
+
+/* ============================================================
+   14) 宿舍「水电报表」头部：信息图标 + 月份选择 + 按钮 + 提示条
+   ============================================================ */
+.dormitory-layout .rp-head {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 18px 22px; margin-bottom: 14px;
+  background: var(--d86-surface); border: 1px solid var(--d86-line);
+  border-radius: 12px; box-shadow: 0 4px 16px rgba(39, 54, 80, .05);
+}
+.dormitory-layout .rp-title { display: flex; align-items: center; gap: 12px; }
+.dormitory-layout .rp-info { width: 24px; height: 24px; flex: 0 0 auto; border-radius: 50%; background: var(--d86-brand-soft); color: var(--d86-brand); display: grid; place-items: center; font-weight: 700; font-size: 14px; }
+.dormitory-layout .rp-title h2 { margin: 0 0 2px; font-size: 18px; font-weight: 700; color: var(--d86-text); }
+.dormitory-layout .rp-title small { color: var(--d86-text-3); font-size: 12px; }
+.dormitory-layout .rp-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.dormitory-layout .rp-field { display: inline-flex; align-items: center; gap: 8px; color: var(--d86-text-2); font-size: 13px; }
+.dormitory-layout .rp-field input { height: 38px; padding: 0 10px; border: 1px solid var(--d86-line); border-radius: 8px; background: #fff; color: var(--d86-text); }
+.dormitory-layout .rp-strip { display: flex; align-items: center; gap: 10px; padding: 12px 16px; margin-bottom: 16px; background: var(--d86-brand-soft); color: var(--d86-brand); border-radius: 10px; font-size: 13px; font-weight: 500; }
+.dormitory-layout .rp-strip .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--d86-brand); flex: 0 0 auto; }
+
+/* ============================================================
+   15) 宿舍「统计总览」卡片：图标 + 色块 + hover
+   ============================================================ */
+.dormitory-layout .dorm-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 16px; margin-bottom: 20px; }
+.dormitory-layout .dorm-stats .stat-tone {
+  display: flex; align-items: center; gap: 14px; padding: 18px; min-height: auto; text-align: left;
+  background: var(--d86-surface); border: 1px solid var(--d86-line); border-radius: 12px;
+  transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+}
+.dormitory-layout .dorm-stats .stat-tone:hover { transform: translateY(-3px); box-shadow: 0 12px 26px rgba(23, 43, 99, .1); }
+.dormitory-layout .stat-ico { width: 44px; height: 44px; flex: 0 0 auto; border-radius: 12px; display: grid; place-items: center; }
+.dormitory-layout .stat-ico svg { width: 22px; height: 22px; }
+.dormitory-layout .stat-body { display: grid; gap: 2px; min-width: 0; }
+.dormitory-layout .stat-body b { font-size: 26px; line-height: 1.1; margin: 0; }
+.dormitory-layout .stat-body span { margin: 0; font-size: 13px; color: var(--d86-text-2); }
+.dormitory-layout .stat-tone.blue   .stat-ico { background: #e8eefc; color: #2b5ce6; }
+.dormitory-layout .stat-tone.blue   .stat-body b { color: #2b5ce6; }
+.dormitory-layout .stat-tone.cyan   .stat-ico { background: #e0f4fb; color: #0e93b8; }
+.dormitory-layout .stat-tone.cyan   .stat-body b { color: #0e93b8; }
+.dormitory-layout .stat-tone.green  .stat-ico { background: #e6f6ea; color: #1f9d55; }
+.dormitory-layout .stat-tone.green  .stat-body b { color: #1f9d55; }
+.dormitory-layout .stat-tone.indigo .stat-ico { background: #ede9fe; color: #5b4bd5; }
+.dormitory-layout .stat-tone.indigo .stat-body b { color: #5b4bd5; }
+.dormitory-layout .stat-tone.pink   .stat-ico { background: #fdeaf1; color: #d13a78; }
+.dormitory-layout .stat-tone.pink   .stat-body b { color: #d13a78; }
+.dormitory-layout .stat-tone.amber  .stat-ico { background: #fdf3dc; color: #c8860b; }
+.dormitory-layout .stat-tone.amber  .stat-body b { color: #c8860b; }
+
+/* ============================================================
+   16) 分区统一头部（预警看板 / 历史档案等）：kicker + 标题 + 说明
+   ============================================================ */
+.dormitory-layout .section-hero {
+  display: flex; align-items: center; justify-content: space-between; gap: 24px;
+  margin-bottom: 16px; padding: 20px 22px;
+  border: 1px solid var(--d86-line); border-left: 4px solid var(--d86-brand);
+  border-radius: 10px; background: var(--d86-surface);
+  box-shadow: 0 3px 14px rgba(35, 52, 83, .045);
+}
+.dormitory-layout .section-hero h2 { margin: 2px 0 3px; font-size: 20px; color: var(--d86-text); }
+.dormitory-layout .section-hero p { margin: 0; color: var(--d86-text-3); font-size: 13px; }
+
+/* ============================================================
+   17) 全站统一：page-head 卡片化（门卫/系统管理/报表/登记查询共用）
+   不影响首页 dash-hero
+   ============================================================ */
+.page-head:not(.dash-hero) {
+  display: flex; justify-content: space-between; align-items: center; gap: 20px;
+  margin-bottom: 24px; padding: 20px 24px;
+  background: var(--d86-surface); border: 1px solid var(--d86-line);
+  border-left: 4px solid var(--d86-brand); border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(39, 54, 80, .05);
+}
+.page-head:not(.dash-hero) h2 { margin: 2px 0 4px; font-size: 22px; color: var(--d86-text); }
+.page-head:not(.dash-hero) .muted { margin: 0; color: var(--d86-text-3); font-size: 13px; }
+@media (max-width: 640px) {
+  .page-head:not(.dash-hero) { flex-direction: column; align-items: stretch; }
+}
+
+/* 全局统计卡 tone 色（ReportsView 等非宿舍页复用 dash-stat 结构） */
+.stat-tone.blue .dash-stat-icon { background: #e8eefc; color: #2b5ce6; }
+.stat-tone.blue .dash-stat-body strong { color: #2b5ce6; }
+.stat-tone.green .dash-stat-icon { background: #e6f6ea; color: #1f9d55; }
+.stat-tone.green .dash-stat-body strong { color: #1f9d55; }
+.stat-tone.amber .dash-stat-icon { background: #fdf3dc; color: #c8860b; }
+.stat-tone.amber .dash-stat-body strong { color: #c8860b; }
