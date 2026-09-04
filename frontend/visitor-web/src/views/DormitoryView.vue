@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from "vue";
 import { useRouter } from "vue-router";
+import VisitorAccommodationPanel from "../components/VisitorAccommodationPanel.vue";
 import {
   dormitoryApi,
   dormitoryExtensionApi,
@@ -29,6 +30,7 @@ function settingIcon(k: string): string {
   return `<svg ${svgAttrs}>` + (SETTING_ICONS[k] || "") + "</svg>";
 }
 const sections = [
+  ["visitors", "访客住宿申请"],
   ["stats", "统计总览"],
   ["floorplan", "可视化平面图"],
   ["dashboard", "预警看板"],
@@ -44,7 +46,7 @@ function logoutDormitory() {
   sessionStorage.removeItem("visitor-authorization");
   router.replace("/login");
 }
-const active = ref("stats"),
+const active = ref("visitors"),
   buildings = ref<BuildingNode[]>([]),
   stays = ref<Stay[]>([]),
   people = ref<Person[]>([]),
@@ -1072,7 +1074,8 @@ onMounted(load);
         <p v-if="error" class="notice-error">{{ error }}</p>
         <p v-if="message" class="notice-success">{{ message }}</p>
         <p v-if="loading" class="muted">正在加载宿舍数据…</p>
-        <template v-if="!loading && active === 'stats'"
+        <VisitorAccommodationPanel v-if="active === 'visitors'" />
+        <template v-else-if="!loading && active === 'stats'"
           ><h3 class="stat-section-title">统计总览 · 卡片</h3>
           <div class="dorm-stats">
             <article v-for="c in statCards" :key="c.label" :class="['stat-tone', c.tone]">

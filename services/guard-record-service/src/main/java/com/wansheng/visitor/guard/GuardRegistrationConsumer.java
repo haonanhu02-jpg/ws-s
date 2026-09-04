@@ -19,9 +19,9 @@ class GuardRegistrationConsumer {
  @RabbitListener(queues="guard.visitor-registered") @Transactional void receive(String payload)throws Exception{
   JsonNode e=json.readTree(payload);String eventId=e.path("eventId").asText();String visitId=e.path("visitId").asText();if(eventId.isBlank()||visitId.isBlank())throw new IllegalArgumentException("invalid event");
   GuardView v=client.get().uri(url+"/internal/registrations/{id}/guard-view",visitId).header("X-Internal-Token",token).retrieve().body(GuardView.class);
-  repo.createIfAbsent(eventId,new GuardRecord(v.visitId(),v.visitorName(),v.mobile(),v.hostName(),v.plateNumber(),v.vehicleEnteringFactory(),false,v.oaStatus(),GuardStatus.WAITING_ENTRY,null,null,null,null),clock.instant());
+  repo.createIfAbsent(eventId,new GuardRecord(v.visitId(),v.visitorName(),v.mobile(),v.hostName(),v.plateNumber(),v.vehicleEnteringFactory(),v.accommodationRequired(),v.oaStatus(),GuardStatus.WAITING_ENTRY,null,null,null,null),clock.instant());
  }
- record GuardView(String visitId,String visitorName,String mobile,String hostName,String plateNumber,boolean vehicleEnteringFactory,String oaStatus){}
+ record GuardView(String visitId,String visitorName,String mobile,String hostName,String plateNumber,boolean vehicleEnteringFactory,boolean accommodationRequired,String oaStatus){}
 }
 
 @Configuration

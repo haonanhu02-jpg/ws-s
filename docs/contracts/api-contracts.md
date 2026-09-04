@@ -19,6 +19,16 @@
 OA 状态为 `NOT_STARTED`；创建和修改均记录操作审计。门卫手工登记还可填写是否住宿；
 选择住宿时，记录通过事件分发给宿舍服务，并进入宿舍待确认流程。
 
+资料更新（含取消）同步宿舍；已确认或已分床的取消返回 409，宿舍状态无法核验返回 503。
+宿舍工作台增加“访客住宿申请”入口，查询真实访客记录，5 秒轮询，支持确认住宿。
+未确认取消后不再显示；确认接口拒绝已取消申请。访客申请不自动创建员工入住台账。
+访客 `check-in/check-out` 仍是 Q-013 契约草案，尚未启用，不能与员工入住退宿混为一谈。
+
+受内部令牌保护的同步接口：
+- `GET /internal/guard/records/{id}/dormitory-view`（含 `detailsVersion`）
+- `GET /internal/dormitory/records/{id}/cancellation-status`（只返回 `allowed`，不向门卫泄露床位）
+- `POST /internal/guard/records/{id}/reject-accommodation-cancellation`（按 `detailsVersion` 条件补偿）
+
 内部管理页面统一使用登录接口签发的 8 小时 `Bearer` Token。用户管理接口仅
 `SYSTEM_ADMIN` 可访问；系统必须保留至少一个启用的系统管理员，当前账号不能
 停用或删除。支持角色：`GUARD`、`DORM_ADMIN`、`ADMIN`、`SYSTEM_ADMIN`。

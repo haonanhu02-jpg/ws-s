@@ -7,6 +7,6 @@ public record GuardRegistrationView(
         String hostName,
         String plateNumber,
         boolean vehicleEnteringFactory,
+        boolean accommodationRequired,
         String oaStatus) {
 }
-

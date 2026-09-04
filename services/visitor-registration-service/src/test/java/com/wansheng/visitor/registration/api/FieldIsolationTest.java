@@ -14,10 +14,10 @@ class FieldIsolationTest {
 
         assertThat(names).containsExactly(
                 "visitId", "visitorName", "mobile", "hostName", "plateNumber",
-                "vehicleEnteringFactory", "oaStatus");
+                "vehicleEnteringFactory", "accommodationRequired", "oaStatus");
         assertThat(names).doesNotContain(
                 "identityCardNumber", "hostDepartment", "visitReason",
-                "accommodationRequired", "phoneNotificationRequested");
+                "phoneNotificationRequested");
     }
     @Test void adminViewDoesNotPrejudgeOaOrIdentityPermissions(){var names=Arrays.stream(AdminRegistrationView.class.getRecordComponents()).map(c->c.getName()).toList();assertThat(names).doesNotContain("identityCardNumber","oaStatus");}
 }

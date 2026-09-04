@@ -104,6 +104,7 @@ services:
       <<: *backend-environment
       DB_URL: jdbc:postgresql://postgres:5432/visitor_database?currentSchema=guard_schema
       REGISTRATION_SERVICE_URL: http://registration-service:8082
+      DORMITORY_SERVICE_URL: http://dormitory-service:8084
       VISITOR_INTERNAL_TOKEN: ${VISITOR_INTERNAL_TOKEN:-visitor-internal-dev-only}
       GUARD_VISIBILITY_MODE: ${GUARD_VISIBILITY_MODE:-IMMEDIATE}
       VISITOR_SECURITY_GUARD_PASSWORD: ${VISITOR_GUARD_PASSWORD:-11111111}

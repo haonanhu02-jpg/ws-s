@@ -19,7 +19,7 @@ class GuardRepository {
         if (jdbc.queryForObject("SELECT COUNT(*) FROM guard_processed_event WHERE event_id=?", Integer.class, eventId) > 0) return;
         jdbc.update("INSERT INTO guard_record(visit_id,visitor_name,mobile,host_name,plate_number," +
                 "vehicle_entering_factory,accommodation_required,oa_status,guard_status,created_at) " +
-                "VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT (visit_id) DO NOTHING",
+                "VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT DO NOTHING",
                 r.visitId(),r.visitorName(),r.mobile(),r.hostName(),r.plateNumber(),r.vehicleEnteringFactory(),
                 r.accommodationRequired(),r.oaStatus(),GuardStatus.WAITING_ENTRY.name(),Timestamp.from(now));
         jdbc.update("INSERT INTO guard_processed_event(event_id,processed_at) VALUES(?,?) ON CONFLICT DO NOTHING", eventId, Timestamp.from(now));
@@ -36,15 +36,30 @@ class GuardRepository {
 
     int updateDetails(String visitId, GuardRecordRequest request, String operator, Instant now) {
         int changed = jdbc.update("UPDATE guard_record SET visitor_name=?,mobile=?,host_name=?,plate_number=?," +
-                        "vehicle_entering_factory=?,accommodation_required=?,version=version+1 WHERE visit_id=?",
+                        "vehicle_entering_factory=?,accommodation_required=?,version=version+1,details_version=details_version+1 WHERE visit_id=?",
                 request.visitorName().trim(), request.mobile().trim(), request.hostName().trim(),
                 normalize(request.plateNumber()), request.vehicleEnteringFactory(), request.accommodationRequired(), visitId);
         if (changed == 1) audit(visitId, "DETAILS_UPDATED", operator, now);
-        if (changed == 1 && request.accommodationRequired()) addOutbox("MANUAL_VISITOR_REGISTERED", visitId, now);
+        if (changed == 1) addOutbox("MANUAL_VISITOR_REGISTERED", visitId, now);
         return changed;
     }
 
     Optional<GuardRecord> find(String visitId) { return jdbc.query("SELECT * FROM guard_record WHERE visit_id=?",this::map,visitId).stream().findFirst(); }
+    List<String> pendingAccommodationSync(){return jdbc.queryForList("SELECT visit_id FROM guard_record WHERE accommodation_sync_pending=TRUE ORDER BY created_at LIMIT 25",String.class);}
+    @org.springframework.transaction.annotation.Transactional
+    void reconcileAccommodation(String id,Boolean originalRequired,Instant now){
+        if(originalRequired!=null)jdbc.update("UPDATE guard_record SET accommodation_required=?,details_version=details_version+1 WHERE visit_id=? AND details_version=0",originalRequired,id);
+        if(jdbc.update("UPDATE guard_record SET accommodation_sync_pending=FALSE WHERE visit_id=? AND accommodation_sync_pending=TRUE",id)==1)addOutbox("MANUAL_VISITOR_REGISTERED",id,now);
+    }
+    Optional<GuardDormitoryView> dormitoryView(String id) {
+        return jdbc.query("SELECT * FROM guard_record WHERE visit_id=?", (r,n) -> new GuardDormitoryView(r.getString("visit_id"),r.getString("visitor_name"),r.getString("mobile"),r.getString("host_name"),r.getBoolean("accommodation_required"),r.getString("plate_number"),r.getBoolean("vehicle_entering_factory"),r.getLong("details_version")),id).stream().findFirst();
+    }
+    void rejectCancellation(String id,long version,Instant now) {
+        if(jdbc.update("UPDATE guard_record SET accommodation_required=TRUE,details_version=details_version+1 WHERE visit_id=? AND details_version=? AND accommodation_required=FALSE",id,version)==1){
+            audit(id,"CANCELLATION_REJECTED_BY_DORMITORY","dormitory-service",now);
+            addOutbox("MANUAL_VISITOR_REGISTERED",id,now);
+        }
+    }
     List<GuardRecord> list(GuardStatus status) { return jdbc.query("SELECT * FROM guard_record WHERE guard_status=? ORDER BY created_at DESC",this::map,status.name()); }
     List<GuardRecord> listAll(){return jdbc.query("SELECT * FROM guard_record ORDER BY created_at DESC",this::map);}
     List<java.util.Map<String,Object>> audits(){return jdbc.query("SELECT visit_id,action,operator_name,operated_at FROM guard_audit_log ORDER BY operated_at DESC LIMIT 200",(r,n)->java.util.Map.of("visitId",r.getString(1),"action",r.getString(2),"operator",r.getString(3),"operatedAt",r.getTimestamp(4).toInstant()));}

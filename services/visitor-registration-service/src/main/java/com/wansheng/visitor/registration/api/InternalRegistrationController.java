@@ -36,7 +36,7 @@ public class InternalRegistrationController {
         Registration item = find(visitId);
         return new GuardRegistrationView(
                 item.visitId(), item.visitorName(), item.mobile(), item.hostName(),
-                item.plateNumber(), item.vehicleEnteringFactory(), item.oaStatus().name());
+                item.plateNumber(), item.vehicleEnteringFactory(), item.accommodationRequired(), item.oaStatus().name());
     }
 
     @GetMapping("/{visitId}/dormitory-view")
