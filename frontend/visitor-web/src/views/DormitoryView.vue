@@ -293,9 +293,18 @@ function roomState(room: Room): RoomState {
 function isFulong(node: BuildingNode): boolean {
   return node.building.name === "伏龙宿舍";
 }
+function isHuacheng(node: BuildingNode): boolean {
+  return node.building.name === "花城宿舍";
+}
 function roomsInOrder(node: BuildingNode, roomNos: string[]): Room[] {
   const rooms = new Map(node.rooms.map((room) => [room.roomNo, room]));
   return roomNos.map((roomNo) => rooms.get(roomNo)).filter((room): room is Room => Boolean(room));
+}
+function roomGridStyle(room: Room): Record<string, string> {
+  return {
+    gridColumn: `${room.gridCol ?? 1} / span ${room.gridColSpan ?? 1}`,
+    gridRow: `${room.gridRow ?? 1} / span ${room.gridRowSpan ?? 1}`,
+  };
 }
 const ROOM_STATE_LABEL: Record<RoomState, string> = {
   public: "公共区域",
@@ -1193,6 +1202,25 @@ onMounted(load);
                   <article v-for="room in roomsInOrder(node, ['302', '303', '304'])" :key="room.id" :class="['fp-room', roomState(room)]">
                     <header><strong>{{ room.roomNo }}</strong><small>{{ room.roomType }} · {{ ROOM_STATE_LABEL[roomState(room)] }}</small></header>
                     <div class="fp-beds"><button v-for="bed in room.beds" :key="bed.id" :aria-label="`${room.roomNo}房床位，${stayByBed[bed.id]?.person.name || '空'}`" :class="{ occupied: stayByBed[bed.id], booked: stayByBed[bed.id]?.status === 'BOOKED' }" @click="openBed(room, bed)"><b>{{ stayByBed[bed.id]?.person.name || '空' }}</b></button></div>
+                  </article>
+                </div>
+              </div>
+            </template>
+            <template v-else-if="isHuacheng(node)">
+              <div class="fp-home-orientation"><b>花城宿舍（大户型 · 东向入户）</b><span>入户门位于东侧</span></div>
+              <div class="fp-huacheng-wrap">
+                <div class="fp-huacheng-grid">
+                  <article
+                    v-for="room in node.rooms"
+                    :key="room.id"
+                    :style="roomGridStyle(room)"
+                    :class="['fp-home-room', room.livable ? roomState(room) : 'public', { entrance: room.roomNo === '入户门' }]"
+                  >
+                    <template v-if="room.livable">
+                      <header><strong>{{ room.roomNo }}</strong><small>{{ room.roomType }} · {{ ROOM_STATE_LABEL[roomState(room)] }}</small></header>
+                      <div class="fp-beds"><button v-for="bed in room.beds" :key="bed.id" :aria-label="`${room.roomNo}床位，${stayByBed[bed.id]?.person.name || '空'}`" :class="{ occupied: stayByBed[bed.id], booked: stayByBed[bed.id]?.status === 'BOOKED' }" @click="openBed(room, bed)"><b>{{ stayByBed[bed.id]?.person.name || '空' }}</b></button></div>
+                    </template>
+                    <strong v-else>{{ room.roomNo }}</strong>
                   </article>
                 </div>
               </div>
