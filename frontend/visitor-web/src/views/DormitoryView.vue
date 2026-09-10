@@ -226,9 +226,35 @@ function selectBuilding(id: number | null) {
 const activeStays = computed(() =>
   stays.value.filter((s) => s.status === "BOOKED" || s.status === "CHECKED_IN"),
 );
-const stayByBed = computed(() =>
-  Object.fromEntries(activeStays.value.map((s) => [s.bed.id, s])),
-);
+const today = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai" }).format(new Date());
+function displayStayForBed(bedId: number): Stay | undefined {
+  const date = today();
+  return activeStays.value
+    .filter((stay) => stay.bed.id === bedId)
+    .sort((a, b) => {
+      const aCurrent = a.status === "CHECKED_IN" || (a.plannedMoveIn <= date && (!a.plannedMoveOut || a.plannedMoveOut >= date));
+      const bCurrent = b.status === "CHECKED_IN" || (b.plannedMoveIn <= date && (!b.plannedMoveOut || b.plannedMoveOut >= date));
+      if (aCurrent !== bCurrent) return aCurrent ? -1 : 1;
+      return a.plannedMoveIn.localeCompare(b.plannedMoveIn);
+    })[0];
+}
+const stayByBed = computed(() => Object.fromEntries(
+  buildings.value.flatMap((node) => node.rooms.flatMap((room) => room.beds.map((bed) => [bed.id, displayStayForBed(bed.id)]))).filter((entry) => entry[1]),
+));
+function bedDisplayName(bed: Bed): string {
+  for (const node of buildings.value) {
+    const room = node.rooms.find((item) => item.id === bed.roomId);
+    if (room) {
+      const index = room.beds.findIndex((item) => item.id === bed.id);
+      return `${node.building.name}-${room.roomNo}-${Math.max(0, index) + 1}号床`;
+    }
+  }
+  return bed.bedCode.replace(/靠窗|靠门|单床/g, "床位");
+}
+const selectedBedName = computed(() => selectedBed.value ? bedDisplayName(selectedBed.value) : "");
+const selectedBedReservations = computed(() => selectedBed.value
+  ? activeStays.value.filter((stay) => stay.bed.id === selectedBed.value?.id).sort((a, b) => a.plannedMoveIn.localeCompare(b.plannedMoveIn))
+  : []);
 const totals = computed(() => {
   const rooms = buildings.value
       .flatMap((b) => b.rooms)
@@ -263,6 +289,13 @@ function roomState(room: Room): RoomState {
   if (bedStays.some((s) => s.status === "CHECKED_IN")) return "live";
   if (bedStays.some((s) => s.status === "BOOKED")) return "book";
   return "ok";
+}
+function isFulong(node: BuildingNode): boolean {
+  return node.building.name === "伏龙宿舍";
+}
+function roomsInOrder(node: BuildingNode, roomNos: string[]): Room[] {
+  const rooms = new Map(node.rooms.map((room) => [room.roomNo, room]));
+  return roomNos.map((roomNo) => rooms.get(roomNo)).filter((room): room is Room => Boolean(room));
 }
 const ROOM_STATE_LABEL: Record<RoomState, string> = {
   public: "公共区域",
@@ -415,15 +448,10 @@ async function saveMeters() {
   );
 }
 function openBed(room: Room, bed: Bed) {
-  const existing = stayByBed.value[bed.id];
-  if (existing) {
-    active.value = "ledger";
-    return;
-  }
   selectedRoom.value = room;
   selectedBed.value = bed;
   modal.value = true;
-  message.value = "";
+  message.value = stayByBed.value[bed.id] ? "该床位已有记录，可继续录入日期不冲突的后续预订" : "";
 }
 async function saveBooking() {
   if (!selectedBed.value) return;
@@ -507,7 +535,7 @@ async function transfer(stay: Stay) {
   const bed = buildings.value
     .flatMap((n) => n.rooms)
     .flatMap((r) => r.beds)
-    .find((b) => b.bedCode === code.trim());
+    .find((b) => b.bedCode === code.trim() || bedDisplayName(b) === code.trim());
   if (!bed) {
     error.value = "目标床位编码不存在";
     return;
@@ -661,7 +689,7 @@ function toggleClean(r: Room) {
 function addBed(r: Room) {
   openResource("bed", {
     roomId: r.id,
-    label: r.roomType === "标间" ? "靠窗" : "单床",
+    label: `${r.beds.length + 1}号床`,
     bedCode: "",
     threePiece: "",
     enabled: true,
@@ -809,7 +837,7 @@ function exportLedger() {
       s.person.department,
       s.person.gender,
       s.person.category,
-      s.bed.bedCode,
+      bedDisplayName(s.bed),
       statusLabel(s.status),
       s.plannedMoveIn,
       s.plannedMoveOut,
@@ -852,7 +880,7 @@ function exportHistory() {
     historyStays.value.map((s) => [
       s.person.name,
       s.person.department,
-      s.bed.bedCode,
+      bedDisplayName(s.bed),
       statusLabel(s.status),
       s.moveInWater,
       s.moveInElectric,
@@ -919,7 +947,7 @@ async function downloadImportTemplate(kind: "people" | "resources") {
       "床位编码",
       "三件套",
     ],
-    [["1号楼", "总部", "101", 1, "南", "标间", "靠窗", "1-101-A", "公司提供"]],
+    [["1号楼", "总部", "101", 1, "南", "标间", "1号床", "1-101-A", "公司提供"]],
   );
 }
 async function chooseImport(kind: "people" | "resources") {
@@ -1001,7 +1029,7 @@ function printStay(stay: Stay, kind: "checkin" | "checkout") {
       `${stay.person.centerName || "-"} / ${stay.person.department}`,
     ],
     ["人员类别", stay.person.category],
-    ["床位编码", stay.bed.bedCode],
+    ["床位", bedDisplayName(stay.bed)],
     ["申请单编码", stay.applicationCode || "-"],
     ["对接人", stay.liaison || "-"],
     ["床位类型", stay.bedType],
@@ -1126,6 +1154,50 @@ onMounted(load);
           </div>
           <div v-for="node in shownBuildings" :key="node.building.id" class="fp-building">
             <header class="fp-building-head"><h3>{{ node.building.name }}<small>{{ node.building.regionName }}</small></h3></header>
+            <template v-if="isFulong(node)">
+              <div class="fp-floor fp-fulong-floor">
+                <b class="fp-floor-label fp-fulong-floor-label"><span>2</span><span>F</span></b>
+                <div class="fp-board fp-fulong-board fp-fulong-board-2f">
+                  <span class="fp-side-label fp-side-label-north">北侧（朝北）</span>
+                  <div class="fp-wet-area"><span>公共浴室</span><span>公共卫生间</span></div>
+                  <article v-for="room in roomsInOrder(node, ['210'])" :key="room.id" :class="['fp-room', roomState(room)]">
+                    <header><strong>{{ room.roomNo }}</strong><small>{{ room.roomType }} · {{ ROOM_STATE_LABEL[roomState(room)] }}</small></header>
+                    <div class="fp-beds"><button v-for="bed in room.beds" :key="bed.id" :aria-label="`${room.roomNo}房床位，${stayByBed[bed.id]?.person.name || '空'}`" :class="{ occupied: stayByBed[bed.id], booked: stayByBed[bed.id]?.status === 'BOOKED' }" @click="openBed(room, bed)"><b>{{ stayByBed[bed.id]?.person.name || '空' }}</b></button></div>
+                  </article>
+                  <div class="fp-stair"><div class="fp-stair-arrows">↑↓</div><div>楼梯</div></div>
+                  <article v-for="room in roomsInOrder(node, ['209', '208', '207'])" :key="room.id" :class="['fp-room', roomState(room)]">
+                    <header><strong>{{ room.roomNo }}</strong><small>{{ room.roomType }} · {{ ROOM_STATE_LABEL[roomState(room)] }}</small></header>
+                    <div class="fp-beds"><button v-for="bed in room.beds" :key="bed.id" :aria-label="`${room.roomNo}房床位，${stayByBed[bed.id]?.person.name || '空'}`" :class="{ occupied: stayByBed[bed.id], booked: stayByBed[bed.id]?.status === 'BOOKED' }" @click="openBed(room, bed)"><b>{{ stayByBed[bed.id]?.person.name || '空' }}</b></button></div>
+                  </article>
+                  <div class="fp-corridor">2楼横向过道（贯穿东西）</div>
+                  <span class="fp-side-label fp-side-label-south">南侧（朝南）</span>
+                  <article v-for="room in roomsInOrder(node, ['206', '205', '204', '203', '202', '201'])" :key="room.id" :class="['fp-room', roomState(room)]">
+                    <header><strong>{{ room.roomNo }}</strong><small>{{ room.roomType }} · {{ ROOM_STATE_LABEL[roomState(room)] }}</small></header>
+                    <div class="fp-beds"><button v-for="bed in room.beds" :key="bed.id" :aria-label="`${room.roomNo}房床位，${stayByBed[bed.id]?.person.name || '空'}`" :class="{ occupied: stayByBed[bed.id], booked: stayByBed[bed.id]?.status === 'BOOKED' }" @click="openBed(room, bed)"><b>{{ stayByBed[bed.id]?.person.name || '空' }}</b></button></div>
+                  </article>
+                </div>
+              </div>
+              <div class="fp-floor fp-fulong-floor">
+                <b class="fp-floor-label fp-fulong-floor-label"><span>3</span><span>F</span></b>
+                <div class="fp-board fp-fulong-board fp-fulong-board-3f">
+                  <span class="fp-side-label fp-side-label-north">北侧（朝北）</span>
+                  <div class="fp-wet-area"><span>公共浴室</span><span>公共卫生间</span></div>
+                  <article v-for="room in roomsInOrder(node, ['301'])" :key="room.id" :class="['fp-room', roomState(room)]">
+                    <header><strong>{{ room.roomNo }}</strong><small>{{ room.roomType }} · {{ ROOM_STATE_LABEL[roomState(room)] }}</small></header>
+                    <div class="fp-beds"><button v-for="bed in room.beds" :key="bed.id" :aria-label="`${room.roomNo}房床位，${stayByBed[bed.id]?.person.name || '空'}`" :class="{ occupied: stayByBed[bed.id], booked: stayByBed[bed.id]?.status === 'BOOKED' }" @click="openBed(room, bed)"><b>{{ stayByBed[bed.id]?.person.name || '空' }}</b></button></div>
+                  </article>
+                  <div class="fp-stair"><div class="fp-stair-arrows">↑↓</div><div>楼梯</div></div>
+                  <div class="fp-drying-area">公共晾晒区</div>
+                  <div class="fp-corridor">3楼横向过道（贯穿东西）</div>
+                  <span class="fp-side-label fp-side-label-south">南侧（朝南）</span>
+                  <article v-for="room in roomsInOrder(node, ['302', '303', '304'])" :key="room.id" :class="['fp-room', roomState(room)]">
+                    <header><strong>{{ room.roomNo }}</strong><small>{{ room.roomType }} · {{ ROOM_STATE_LABEL[roomState(room)] }}</small></header>
+                    <div class="fp-beds"><button v-for="bed in room.beds" :key="bed.id" :aria-label="`${room.roomNo}房床位，${stayByBed[bed.id]?.person.name || '空'}`" :class="{ occupied: stayByBed[bed.id], booked: stayByBed[bed.id]?.status === 'BOOKED' }" @click="openBed(room, bed)"><b>{{ stayByBed[bed.id]?.person.name || '空' }}</b></button></div>
+                  </article>
+                </div>
+              </div>
+            </template>
+            <template v-else>
             <div v-for="floor in [...new Set(node.rooms.map((r) => r.floorNo))]" :key="floor" class="fp-floor">
               <b class="fp-floor-label">{{ floor }}F</b>
               <div class="fp-board">
@@ -1135,7 +1207,7 @@ onMounted(load);
                   <article v-for="room in node.rooms.filter((r) => r.floorNo === floor && r.roomType.includes('标间'))" :key="room.id" :class="['fp-room', roomState(room)]">
                     <header><strong>{{ room.roomNo }}</strong><small>{{ room.roomType }} · {{ ROOM_STATE_LABEL[roomState(room)] }}</small></header>
                     <div v-if="room.livable" class="fp-beds">
-                      <button v-for="bed in room.beds" :key="bed.id" :class="{ occupied: stayByBed[bed.id], booked: stayByBed[bed.id]?.status === 'BOOKED' }" @click="openBed(room, bed)"><span>{{ bed.label }}</span><b>{{ stayByBed[bed.id]?.person.name || "空" }}</b></button>
+                      <button v-for="bed in room.beds" :key="bed.id" :aria-label="`${room.roomNo}房床位，${stayByBed[bed.id]?.person.name || '空'}`" :class="{ occupied: stayByBed[bed.id], booked: stayByBed[bed.id]?.status === 'BOOKED' }" @click="openBed(room, bed)"><b>{{ stayByBed[bed.id]?.person.name || "空" }}</b></button>
                     </div>
                     <p v-else>公共区域</p>
                   </article>
@@ -1145,7 +1217,7 @@ onMounted(load);
                   <article v-for="room in node.rooms.filter((r) => r.floorNo === floor && !r.roomType.includes('标间'))" :key="room.id" :class="['fp-room', roomState(room)]">
                     <header><strong>{{ room.roomNo }}</strong><small>{{ room.roomType }} · {{ ROOM_STATE_LABEL[roomState(room)] }}</small></header>
                     <div v-if="room.livable" class="fp-beds">
-                      <button v-for="bed in room.beds" :key="bed.id" :class="{ occupied: stayByBed[bed.id], booked: stayByBed[bed.id]?.status === 'BOOKED' }" @click="openBed(room, bed)"><span>{{ bed.label }}</span><b>{{ stayByBed[bed.id]?.person.name || "空" }}</b></button>
+                      <button v-for="bed in room.beds" :key="bed.id" :aria-label="`${room.roomNo}房床位，${stayByBed[bed.id]?.person.name || '空'}`" :class="{ occupied: stayByBed[bed.id], booked: stayByBed[bed.id]?.status === 'BOOKED' }" @click="openBed(room, bed)"><b>{{ stayByBed[bed.id]?.person.name || "空" }}</b></button>
                     </div>
                     <p v-else>公共区域</p>
                   </article>
@@ -1153,6 +1225,7 @@ onMounted(load);
                 <span class="fp-axis south">↓ 南 · 单间</span>
               </div>
             </div>
+            </template>
           </div></template
         >
         <template v-else-if="!loading && active === 'dashboard'"
@@ -1194,7 +1267,7 @@ onMounted(load);
                   <td>{{ s.person.name }}</td>
                   <td>{{ s.person.department }}</td>
                   <td>{{ s.person.gender }}</td>
-                  <td>{{ s.bed.bedCode }}</td>
+                  <td>{{ bedDisplayName(s.bed) }}</td>
                   <td><span :class="['ledger-status', s.status.toLowerCase()]">{{ statusLabel(s.status) }}</span></td>
                   <td>{{ s.plannedMoveIn }}</td>
                   <td>{{ s.plannedMoveOut || "-" }}</td>
@@ -1312,7 +1385,7 @@ onMounted(load);
                 </thead>
                 <tbody>
                   <tr v-for="s in personHistory" :key="s.id">
-                    <td>{{ s.bed.bedCode }}</td>
+                    <td>{{ bedDisplayName(s.bed) }}</td>
                     <td>{{ statusLabel(s.status) }}</td>
                     <td>{{ s.plannedMoveIn }}</td>
                     <td>{{ s.plannedMoveOut || "-" }}</td>
@@ -1430,7 +1503,7 @@ onMounted(load);
                 <tr v-for="s in historyStays" :key="s.id">
                   <td>{{ s.person.name }}</td>
                   <td>{{ s.person.department }}</td>
-                  <td>{{ s.bed.bedCode }}</td>
+                  <td>{{ bedDisplayName(s.bed) }}</td>
                   <td>{{ statusLabel(s.status) }}</td>
                   <td>{{ s.plannedMoveIn }}</td>
                   <td>{{ localTime(s.checkedOutAt || "") }}</td>
@@ -1533,7 +1606,7 @@ onMounted(load);
                     <td>
                       <div class="setting-beds">
                         <span v-for="bed in room.beds" :key="bed.id"
-                          ><b>{{ bed.label }}</b> {{ bed.bedCode }}（{{
+                          ><b>{{ bedDisplayName(bed) }}</b>（{{
                             bed.enabled ? "启用" : "停用"
                           }}）<button @click="editBed(bed)">编辑</button
                           ><button @click="toggleBed(bed)">
@@ -1597,7 +1670,12 @@ onMounted(load);
         <button type="button" class="drawer-close" @click="modal = false">
           ×
         </button>
-        <h3>{{ selectedRoom?.roomNo }} · {{ selectedBed?.label }}</h3>
+        <h3>{{ selectedBedName }}</h3>
+        <div v-if="selectedBedReservations.length" class="booking-schedule">
+          <b>已有住宿时间</b>
+          <span v-for="stay in selectedBedReservations" :key="stay.id">{{ stay.person.name }}：{{ stay.plannedMoveIn }} 至 {{ stay.plannedMoveOut || "未定" }}</span>
+          <small>可继续录入与以上日期不重叠的后续入住人员。</small>
+        </div>
         <div class="booking-grid">
           <label>姓名<input v-model.trim="form.name" required /></label
           ><label>中心<input v-model.trim="form.centerName" /></label
@@ -1820,7 +1898,7 @@ onMounted(load);
         </button>
         <h3>办理退宿 · {{ checkoutStay?.person.name }}</h3>
         <p class="muted">
-          床位：{{ checkoutStay?.bed.bedCode }}，退宿时间由服务器生成。
+          床位：{{ checkoutStay ? bedDisplayName(checkoutStay.bed) : "" }}，退宿时间由服务器生成。
         </p>
         <div class="booking-grid">
           <label

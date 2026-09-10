@@ -708,7 +708,7 @@ tbody tr:hover { background: var(--d86-brand-soft); }
 .dormitory-layout .fp-room.public > header small { color: #6a1b9a; }
 .dormitory-layout .fp-beds { display: flex; flex-direction: column; }
 .dormitory-layout .fp-beds button {
-  display: flex; justify-content: space-between; align-items: center; gap: 6px;
+  display: flex; justify-content: flex-end; align-items: center; gap: 6px;
   padding: 4px 8px; min-height: auto; border: 0; border-radius: 0;
   background: rgba(255, 255, 255, .55); color: inherit; box-shadow: none;
   font-size: 12px; font-weight: 500; cursor: pointer;
@@ -719,6 +719,82 @@ tbody tr:hover { background: var(--d86-brand-soft); }
 .dormitory-layout .fp-beds button b { font-weight: 600; }
 .dormitory-layout .fp-beds button.occupied b { color: #1565c0; }
 .dormitory-layout .fp-beds button.booked b { color: #b26a00; }
+.dormitory-layout .fp-fulong-floor {
+  display: grid;
+  grid-template-columns: 40px minmax(1040px, 1fr);
+  align-items: stretch;
+  gap: 10px;
+  overflow-x: auto;
+}
+.dormitory-layout .fp-fulong-floor-label {
+  display: grid;
+  place-content: center;
+  align-self: stretch;
+  gap: 0;
+  min-height: 100%;
+  margin: 0;
+  padding: 8px 0;
+  font-size: 16px;
+  line-height: 1;
+}
+.dormitory-layout .fp-fulong-board {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(150px, 1fr));
+  gap: 8px;
+}
+.dormitory-layout .fp-fulong-board .fp-side-label {
+  grid-column: 1 / -1;
+  color: var(--d86-text-3);
+  font-size: 11px;
+  font-weight: 500;
+}
+.dormitory-layout .fp-fulong-board .fp-side-label-south { margin-top: 0; }
+.dormitory-layout .fp-fulong-board .fp-room,
+.dormitory-layout .fp-fulong-board .fp-stair,
+.dormitory-layout .fp-fulong-board .fp-wet-area { min-height: 116px; }
+.dormitory-layout .fp-fulong-board .fp-room > header { min-height: 48px; }
+.dormitory-layout .fp-fulong-board .fp-corridor {
+  grid-column: 1 / -1;
+  height: 28px;
+}
+.dormitory-layout .fp-wet-area {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  overflow: hidden;
+  border: 1px solid #c8e6c9;
+  border-radius: 8px;
+  background: #e8f5e9;
+  color: #2e7d32;
+  font-size: 12px;
+  font-weight: 600;
+}
+.dormitory-layout .fp-wet-area span { display: grid; place-items: center; padding: 8px; text-align: center; }
+.dormitory-layout .fp-wet-area span + span { border-left: 1px dashed rgba(46, 125, 50, .25); }
+.dormitory-layout .fp-fulong-board-3f { grid-template-rows: auto 116px 28px auto 116px; }
+.dormitory-layout .fp-fulong-board-3f .fp-side-label-north { grid-row: 1; }
+.dormitory-layout .fp-fulong-board-3f .fp-wet-area { grid-column: 1; grid-row: 2; }
+.dormitory-layout .fp-fulong-board-3f .fp-room:nth-of-type(1) { grid-column: 2; grid-row: 2; }
+.dormitory-layout .fp-fulong-board-3f .fp-stair { grid-column: 3; grid-row: 2; }
+.dormitory-layout .fp-fulong-board-3f .fp-drying-area {
+  grid-column: 4 / -1;
+  grid-row: 2 / 6;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--d86-line);
+  border-radius: 8px;
+  background: #f7f8fa;
+  color: var(--d86-text-3);
+  font-size: 13px;
+  font-weight: 500;
+}
+.dormitory-layout .fp-fulong-board-3f .fp-corridor { grid-column: 1 / 4; grid-row: 3; }
+.dormitory-layout .fp-fulong-board-3f .fp-side-label-south { grid-column: 1 / 4; grid-row: 4; }
+.dormitory-layout .fp-fulong-board-3f .fp-room:nth-of-type(2) { grid-column: 1; grid-row: 5; }
+.dormitory-layout .fp-fulong-board-3f .fp-room:nth-of-type(3) { grid-column: 2; grid-row: 5; }
+.dormitory-layout .fp-fulong-board-3f .fp-room:nth-of-type(4) { grid-column: 3; grid-row: 5; }
+.dormitory-layout .booking-schedule { display: grid; gap: 6px; margin: 0 0 16px; padding: 12px 14px; border: 1px solid #cbd8f4; border-radius: 8px; background: #f5f8ff; color: var(--d86-text); font-size: 13px; }
+.dormitory-layout .booking-schedule span { color: var(--d86-text-2); }
+.dormitory-layout .booking-schedule small { color: var(--d86-brand); }
 
 /* ============================================================
    14) 宿舍「水电报表」头部：信息图标 + 月份选择 + 按钮 + 提示条
