@@ -855,6 +855,55 @@ tbody tr:hover { background: var(--d86-brand-soft); }
 }
 .dormitory-layout .fp-home-room .fp-beds { flex: 1; }
 .dormitory-layout .fp-home-room .fp-beds button { flex: 1; min-height: 38px; }
+.dormitory-layout .fp-aodiluo-floor {
+  display: grid;
+  grid-template-columns: 40px minmax(980px, 1fr);
+  align-items: stretch;
+  gap: 10px;
+  overflow-x: auto;
+}
+.dormitory-layout .fp-aodiluo-floor-label {
+  display: grid;
+  place-content: center;
+  align-self: stretch;
+  gap: 0;
+  min-height: 100%;
+  margin: 0;
+  padding: 8px 0;
+  font-size: 16px;
+  line-height: 1;
+}
+.dormitory-layout .fp-aodiluo-board {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(135px, 1fr));
+  grid-template-rows: auto minmax(112px, auto) auto minmax(92px, auto) minmax(92px, auto) 28px;
+  min-width: 980px;
+  gap: 8px;
+}
+.dormitory-layout .fp-aodiluo-board .fp-side-label {
+  grid-column: 1 / -1;
+  color: var(--d86-text-3);
+  font-size: 11px;
+  font-weight: 500;
+}
+.dormitory-layout .fp-aodiluo-board > .fp-room:nth-of-type(-n + 6) { grid-row: 2; }
+.dormitory-layout .fp-aodiluo-board .fp-side-label-east { grid-row: 3; }
+.dormitory-layout .fp-aodiluo-side-room { grid-column: 1; }
+.dormitory-layout .fp-aodiluo-side-room:nth-of-type(7) { grid-row: 4; }
+.dormitory-layout .fp-aodiluo-side-room:nth-of-type(8) { grid-row: 5; }
+.dormitory-layout .fp-courtyard {
+  grid-column: 2 / -1;
+  grid-row: 4 / 6;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--d86-line);
+  border-radius: 8px;
+  background: #f3f5f8;
+  color: var(--d86-text-3);
+  font-size: 14px;
+  letter-spacing: .45em;
+}
+.dormitory-layout .fp-aodiluo-board .fp-corridor { grid-column: 1 / -1; grid-row: 6; }
 .dormitory-layout .booking-schedule { display: grid; gap: 6px; margin: 0 0 16px; padding: 12px 14px; border: 1px solid #cbd8f4; border-radius: 8px; background: #f5f8ff; color: var(--d86-text); font-size: 13px; }
 .dormitory-layout .booking-schedule span { color: var(--d86-text-2); }
 .dormitory-layout .booking-schedule small { color: var(--d86-brand); }
