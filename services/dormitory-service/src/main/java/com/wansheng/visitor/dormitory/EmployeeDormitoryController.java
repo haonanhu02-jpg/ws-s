@@ -23,6 +23,7 @@ class EmployeeDormitoryController {
  @PutMapping("/rooms/{id}") Room updateRoom(@PathVariable long id,@Valid @RequestBody RoomCommand c,Principal p){return service.updateRoom(id,c,p.getName());}
  @PostMapping("/beds") Bed addBed(@Valid @RequestBody BedCommand c,Principal p){return service.addBed(c,p.getName());}
  @PutMapping("/beds/{id}") Bed updateBed(@PathVariable long id,@Valid @RequestBody BedCommand c,Principal p){return service.updateBed(id,c,p.getName());}
+ @PostMapping("/beds/{id}/cleaning") Bed setBedCleaning(@PathVariable long id,@Valid @RequestBody CleaningCommand c,Principal p){return service.setBedCleaning(id,c,p.getName());}
  @GetMapping("/resource-audits") List<ResourceAudit> resourceAudits(){return service.resourceAudits();}
  @GetMapping("/stay-audits") List<StayAudit> stayAudits(){return service.stayAudits();}
  @GetMapping("/meter-readings") List<MeterReading> meterReadings(@RequestParam String month){return service.meterReadings(month);}
@@ -33,10 +34,12 @@ class EmployeeDormitoryController {
  @PutMapping("/people/{id}") Person updatePerson(@PathVariable long id,@Valid @RequestBody PersonCommand c){return service.updatePerson(id,c);}
  @PostMapping("/imports/people") ImportSummary importPeople(@Valid @RequestBody List<@Valid PersonCommand> commands,Principal p){return service.importPeople(commands,p.getName());}
  @PostMapping("/imports/resources") ImportSummary importResources(@Valid @RequestBody List<@Valid ResourceImportCommand> commands,Principal p){return service.importResources(commands,p.getName());}
+ @PostMapping("/imports/stays") StayImportSummary importStays(@Valid @RequestBody List<@Valid StayImportCommand> commands,Principal p){return service.importStays(commands,p.getName());}
  @GetMapping("/people/{id}/stays") List<Stay> personStays(@PathVariable long id){return service.personStays(id);}
  @GetMapping("/stays") List<Stay> stays(@RequestParam(required=false)String status,@RequestParam(required=false)Long buildingId,@RequestParam(required=false)String name){return service.stays(status,buildingId,name);}
  @GetMapping("/stays/{id}") Stay stay(@PathVariable long id){return service.stay(id);}
  @PostMapping("/stays/book") Stay book(@Valid @RequestBody BookCommand c,Principal p){return service.book(c,p.getName());}
+ @PutMapping("/stays/{id}") Stay updateStay(@PathVariable long id,@Valid @RequestBody UpdateStayCommand c,Principal p){return service.updateStay(id,c,p.getName());}
  @PostMapping("/stays/{id}/check-in") Stay checkIn(@PathVariable long id,Principal p){return service.checkIn(id,p.getName());}
  @PostMapping("/stays/{id}/transfer") Stay transfer(@PathVariable long id,@Valid @RequestBody TransferCommand c,Principal p){return service.transfer(id,c,p.getName());}
  @PostMapping("/stays/{id}/extend") Stay extend(@PathVariable long id,@Valid @RequestBody ExtendCommand c,Principal p){return service.extend(id,c,p.getName());}

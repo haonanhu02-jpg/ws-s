@@ -740,6 +740,16 @@ tbody tr:hover { background: var(--d86-brand-soft); }
   font-size: 11px;
   font-weight: 600;
 }
+.dormitory-layout .fp-room-card-head > span sup{margin-left:2px;color:#c62828;font-size:15px;line-height:1}
+.dormitory-layout .fp-sw.clean{background:#d83a3a;border-color:#b91c1c}
+.dormitory-layout .fp-beds button.cleaning,.dormitory-layout .fp-beds button.cleaning.occupied,.dormitory-layout .fp-beds button.cleaning.booked{background:#d83a3a!important;border-color:#b91c1c!important;color:#fff!important}
+.dormitory-layout .fp-beds button.cleaning>*{display:none}
+.dormitory-layout .fp-beds button.cleaning::after{content:"待打扫";display:block;color:#fff;font-weight:700}
+.dormitory-layout .booking-schedule{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;margin:12px 0;padding:12px;border:1px solid var(--d86-line);border-radius:8px;background:#f8fafc}
+.dormitory-layout .booking-schedule>b,.dormitory-layout .booking-schedule>small{grid-column:1/-1}
+.dormitory-layout .booking-schedule button{display:grid;gap:3px;width:auto;margin:0;padding:10px 12px;text-align:left;background:#fff;color:var(--d86-text);border:1px solid var(--d86-line);border-radius:7px}
+.dormitory-layout .booking-schedule button.active{border-color:var(--d86-primary);background:var(--d86-primary-soft);box-shadow:0 0 0 2px rgba(47,91,234,.12)}
+.dormitory-layout .booking-schedule button span,.dormitory-layout .booking-schedule button small{font-size:12px;color:var(--d86-text-2)}
 .dormitory-layout .fp-room-card-head > div { display: flex; align-items: baseline; gap: 10px; }
 .dormitory-layout .fp-room-card-head > div strong { color: var(--d86-text); font-size: 20px; line-height: 1; }
 .dormitory-layout .fp-room-card-head > div em { color: #245787; font-size: 13px; font-style: normal; font-weight: 700; }

@@ -1,0 +1,3 @@
+ALTER TABLE dorm_stay ADD COLUMN three_piece_note VARCHAR(500);
+ALTER TABLE dorm_stay ADD COLUMN cleaning_required BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE dorm_bed ADD COLUMN cleaning_required BOOLEAN NOT NULL DEFAULT FALSE;
