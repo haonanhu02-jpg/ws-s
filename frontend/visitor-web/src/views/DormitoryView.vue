@@ -2,6 +2,7 @@
 import { computed, onMounted, reactive, ref } from "vue";
 import { useRouter } from "vue-router";
 import VisitorAccommodationPanel from "../components/VisitorAccommodationPanel.vue";
+import { chooseBedStay, classifyRoomBeds, effectiveOccupancyStatus } from "../utils/dormitoryOccupancy";
 import {
   dormitoryApi,
   dormitoryExtensionApi,
@@ -144,8 +145,9 @@ const shownStays = computed(() =>
 const shownTotals = computed(() => {
   const rooms = shownBuildings.value.flatMap((n) => n.rooms).filter((r) => r.livable);
   const beds = rooms.flatMap((r) => r.beds).filter((b) => b.enabled);
-  const booked = shownStays.value.filter((s) => s.status === "BOOKED").length;
-  const occupied = shownStays.value.filter((s) => s.status === "CHECKED_IN").length;
+  const displayed = beds.map((bed) => displayStayForBed(bed.id)).filter((stay): stay is Stay => Boolean(stay));
+  const booked = displayed.filter((stay) => effectiveStayStatus(stay) === "BOOKED").length;
+  const occupied = displayed.filter((stay) => effectiveStayStatus(stay) === "CHECKED_IN").length;
   return {
     buildings: shownBuildings.value.length,
     rooms: rooms.length,
@@ -162,7 +164,9 @@ const remoteBuilding = computed(() =>
   buildings.value.find((node) => /[岙吞底罗空间]/.test(node.building.name)) ?? buildings.value.at(-1),
 );
 const overview = computed(() => {
-  const checkedIn = shownStays.value.filter((stay) => stay.status === "CHECKED_IN");
+  const checkedIn = shownBuildings.value.flatMap((node) => node.rooms).flatMap((room) => room.beds)
+    .map((bed) => displayStayForBed(bed.id)).filter((stay): stay is Stay => Boolean(stay))
+    .filter((stay) => effectiveStayStatus(stay) === "CHECKED_IN");
   const totalBeds = shownTotals.value.beds;
   return {
     rooms: shownTotals.value.rooms,
@@ -177,39 +181,29 @@ const capacityRows = computed(() => {
   const labels = ["单间", "标间"];
   return labels.map((label) => {
     const rooms = shownBuildings.value.flatMap((node) => node.rooms).filter((room) => room.livable && room.roomType.includes(label));
-    const bedIds = new Set(rooms.flatMap((room) => room.beds.filter((bed) => bed.enabled).map((bed) => bed.id)));
-    const scoped = shownStays.value.filter((stay) => bedIds.has(stay.bed.id));
-    const occupied = scoped.filter((stay) => stay.status === "CHECKED_IN");
-    const booked = scoped.filter((stay) => stay.status === "BOOKED");
-    const totalBeds = bedIds.size;
-    const free = Math.max(0, totalBeds - occupied.length - booked.length);
-    return {
-      label,
-      freeMale: Math.ceil(free / 2),
-      freeFemale: Math.floor(free / 2),
-      occupiedMale: occupied.filter((stay) => stay.person.gender === "男").length,
-      occupiedFemale: occupied.filter((stay) => stay.person.gender === "女").length,
-      bookedMale: booked.filter((stay) => stay.person.gender === "男").length,
-      bookedFemale: booked.filter((stay) => stay.person.gender === "女").length,
-    };
+    const row = { label, freePending: 0, freeMale: 0, freeFemale: 0, occupiedMale: 0, occupiedFemale: 0, bookedMale: 0, bookedFemale: 0 };
+    for (const room of rooms) {
+      const roomCounts = classifyRoomBeds(room.beds.filter((bed) => bed.enabled).map((bed) => displayStayForBed(bed.id)), today());
+      for (const key of Object.keys(roomCounts) as Array<keyof typeof roomCounts>) row[key] += roomCounts[key];
+    }
+    return row;
   });
 });
 const capacityTotal = computed(() => capacityRows.value.reduce((total, row) => ({
   label: "合计",
+  freePending: total.freePending + row.freePending,
   freeMale: total.freeMale + row.freeMale,
   freeFemale: total.freeFemale + row.freeFemale,
   occupiedMale: total.occupiedMale + row.occupiedMale,
   occupiedFemale: total.occupiedFemale + row.occupiedFemale,
   bookedMale: total.bookedMale + row.bookedMale,
   bookedFemale: total.bookedFemale + row.bookedFemale,
-}), { label: "合计", freeMale: 0, freeFemale: 0, occupiedMale: 0, occupiedFemale: 0, bookedMale: 0, bookedFemale: 0 }));
-const shownBuildingStatistics = computed(() =>
-  selectedBuilding.value === null
-    ? statistics.value?.buildings ?? []
-    : (statistics.value?.buildings ?? []).filter(
-        (x) => x.name === shownBuildings.value[0]?.building.name,
-      ),
-);
+}), { label: "合计", freePending: 0, freeMale: 0, freeFemale: 0, occupiedMale: 0, occupiedFemale: 0, bookedMale: 0, bookedFemale: 0 }));
+const shownBuildingStatistics = computed(() => shownBuildings.value.map((node) => {
+  const beds = node.rooms.filter((room) => room.livable).flatMap((room) => room.beds).filter((bed) => bed.enabled);
+  const active = beds.filter((bed) => Boolean(displayStayForBed(bed.id))).length;
+  return { name: node.building.name, total: beds.length, active };
+}));
 const shownCategories = computed(() => {
   if (selectedBuilding.value === null) return statistics.value?.categories ?? [];
   const names = new Map<string, { name: string; total: number; active: number }>();
@@ -223,16 +217,18 @@ const shownCategories = computed(() => {
   return [...names.values()];
 });
 const shownStatuses = computed(() => {
-  if (selectedBuilding.value === null) return statistics.value?.statuses ?? [];
   const labels: Record<Stay["status"], string> = {
     BOOKED: "已预定",
     CHECKED_IN: "已入住",
     CHECKED_OUT: "已退宿",
     CANCELLED: "已取消",
   };
-  return Object.entries(labels).map(([status, name]) => ({
-    name,
-    total: shownStays.value.filter((s) => s.status === status).length,
+  const displayed = shownBuildings.value.flatMap((node) => node.rooms).flatMap((room) => room.beds.filter((bed) => bed.enabled))
+    .map((bed) => displayStayForBed(bed.id)).filter((stay): stay is Stay => Boolean(stay));
+  return Object.entries(labels).map(([status, name]) => ({ name, total:
+    status === "BOOKED" || status === "CHECKED_IN"
+      ? displayed.filter((stay) => effectiveStayStatus(stay) === status).length
+      : shownStays.value.filter((stay) => stay.status === status).length,
     active: 0,
   }));
 });
@@ -244,22 +240,19 @@ const activeStays = computed(() =>
   stays.value.filter((s) => s.status === "BOOKED" || s.status === "CHECKED_IN"),
 );
 const today = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai" }).format(new Date());
+function effectiveStayStatus(stay: Stay): "BOOKED" | "CHECKED_IN" | null {
+  return effectiveOccupancyStatus(stay, today());
+}
 function displayStayForBed(bedId: number): Stay | undefined {
-  const date = today();
-  return activeStays.value
-    .filter((stay) => stay.bed.id === bedId)
-    .sort((a, b) => {
-      const aCurrent = a.status === "CHECKED_IN" || (a.plannedMoveIn <= date && (!a.plannedMoveOut || a.plannedMoveOut >= date));
-      const bCurrent = b.status === "CHECKED_IN" || (b.plannedMoveIn <= date && (!b.plannedMoveOut || b.plannedMoveOut >= date));
-      if (aCurrent !== bCurrent) return aCurrent ? -1 : 1;
-      return a.plannedMoveIn.localeCompare(b.plannedMoveIn);
-    })[0];
+  return chooseBedStay(activeStays.value.filter((stay) => stay.bed.id === bedId), today());
 }
 const stayByBed = computed(() => Object.fromEntries(
   buildings.value.flatMap((node) => node.rooms.flatMap((room) => room.beds.map((bed) => [bed.id, displayStayForBed(bed.id)]))).filter((entry) => entry[1]),
 ));
 const occupiedByBed = computed<Record<number, Stay>>(() => Object.fromEntries(
-  stays.value.filter((stay) => stay.status === "CHECKED_IN").map((stay) => [stay.bed.id, stay]),
+  buildings.value.flatMap((node) => node.rooms).flatMap((room) => room.beds)
+    .map((bed) => [bed.id, displayStayForBed(bed.id)] as const)
+    .filter((entry): entry is readonly [number, Stay] => Boolean(entry[1]) && effectiveStayStatus(entry[1]!) === "CHECKED_IN"),
 ));
 function roomGender(room: Room): "男" | "女" | "" {
   return room.beds.map((bed) => occupiedByBed.value[bed.id]?.person.gender).find(Boolean) ?? "";
@@ -321,8 +314,8 @@ function roomState(room: Room): RoomState {
   if (!room.livable) return "public";
   if (room.cleaningRequired) return "clean";
   const bedStays = room.beds.map((b) => stayByBed.value[b.id]).filter(Boolean);
-  if (bedStays.some((s) => s.status === "CHECKED_IN")) return "live";
-  if (bedStays.some((s) => s.status === "BOOKED")) return "book";
+  if (bedStays.some((s) => effectiveStayStatus(s) === "CHECKED_IN")) return "live";
+  if (bedStays.some((s) => effectiveStayStatus(s) === "BOOKED")) return "book";
   return "ok";
 }
 function isFulong(node: BuildingNode): boolean {
@@ -1273,10 +1266,10 @@ onMounted(load);
               <h3>{{ selectedBuilding === null ? "全集团" : shownBuildings[0]?.building.name }}总览</h3>
               <div class="table-wrap">
                 <table class="capacity-table">
-                  <thead><tr><th>房型</th><th>可入住男</th><th>可入住女</th><th>已入住男</th><th>已入住女</th><th>已预定男</th><th>已预定女</th></tr></thead>
+                  <thead><tr><th>房型</th><th>可入住待定</th><th>可入住男</th><th>可入住女</th><th>已入住男</th><th>已入住女</th><th>已预定男</th><th>已预定女</th></tr></thead>
                   <tbody>
-                    <tr v-for="row in capacityRows" :key="row.label"><td>{{ row.label }}</td><td>{{ row.freeMale }}</td><td>{{ row.freeFemale }}</td><td>{{ row.occupiedMale }}</td><td>{{ row.occupiedFemale }}</td><td>{{ row.bookedMale }}</td><td>{{ row.bookedFemale }}</td></tr>
-                    <tr class="summary-total"><td>{{ capacityTotal.label }}</td><td>{{ capacityTotal.freeMale }}</td><td>{{ capacityTotal.freeFemale }}</td><td>{{ capacityTotal.occupiedMale }}</td><td>{{ capacityTotal.occupiedFemale }}</td><td>{{ capacityTotal.bookedMale }}</td><td>{{ capacityTotal.bookedFemale }}</td></tr>
+                    <tr v-for="row in capacityRows" :key="row.label"><td>{{ row.label }}</td><td>{{ row.freePending }}</td><td>{{ row.freeMale }}</td><td>{{ row.freeFemale }}</td><td>{{ row.occupiedMale }}</td><td>{{ row.occupiedFemale }}</td><td>{{ row.bookedMale }}</td><td>{{ row.bookedFemale }}</td></tr>
+                    <tr class="summary-total"><td>{{ capacityTotal.label }}</td><td>{{ capacityTotal.freePending }}</td><td>{{ capacityTotal.freeMale }}</td><td>{{ capacityTotal.freeFemale }}</td><td>{{ capacityTotal.occupiedMale }}</td><td>{{ capacityTotal.occupiedFemale }}</td><td>{{ capacityTotal.bookedMale }}</td><td>{{ capacityTotal.bookedFemale }}</td></tr>
                   </tbody>
                 </table>
               </div>

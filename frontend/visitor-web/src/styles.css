@@ -719,6 +719,14 @@ tbody tr:hover { background: var(--d86-brand-soft); }
 .dormitory-layout .fp-beds button b { font-weight: 600; }
 .dormitory-layout .fp-beds button.occupied b { color: #1565c0; }
 .dormitory-layout .fp-beds button.booked b { color: #b26a00; }
+.dormitory-layout .fp-room.ok,
+.dormitory-layout .fp-room.book,
+.dormitory-layout .fp-room.live,
+.dormitory-layout .fp-room.clean { background: var(--d86-surface); border-color: var(--d86-line); }
+.dormitory-layout .fp-beds button:not(.occupied):not(.booked):not(.cleaning) { background: #e8f5e9; color: #2e7d32; }
+.dormitory-layout .fp-beds button.booked:not(.occupied):not(.cleaning) { background: #fff8e1; color: #b26a00; }
+.dormitory-layout .fp-beds button.occupied:not(.cleaning) { background: #dbeafe; color: #1565c0; }
+.dormitory-layout .fp-beds button.occupied:not(.cleaning) b { color: #1565c0; }
 .dormitory-layout .fp-room > header.fp-room-card-head,
 .dormitory-layout .fp-home-room > header.fp-room-card-head {
   display: flex;
