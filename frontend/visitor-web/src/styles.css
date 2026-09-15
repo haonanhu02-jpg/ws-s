@@ -719,6 +719,45 @@ tbody tr:hover { background: var(--d86-brand-soft); }
 .dormitory-layout .fp-beds button b { font-weight: 600; }
 .dormitory-layout .fp-beds button.occupied b { color: #1565c0; }
 .dormitory-layout .fp-beds button.booked b { color: #b26a00; }
+.dormitory-layout .fp-room > header.fp-room-card-head,
+.dormitory-layout .fp-home-room > header.fp-room-card-head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 7px;
+  min-height: 76px;
+  padding: 10px 12px;
+}
+.dormitory-layout .fp-room-card-head > span {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 2px 8px;
+  border: 1px solid #c8e6c9;
+  border-radius: 6px;
+  background: rgba(232, 245, 233, .9);
+  color: #2e7d32;
+  font-size: 11px;
+  font-weight: 600;
+}
+.dormitory-layout .fp-room-card-head > div { display: flex; align-items: baseline; gap: 10px; }
+.dormitory-layout .fp-room-card-head > div strong { color: var(--d86-text); font-size: 20px; line-height: 1; }
+.dormitory-layout .fp-room-card-head > div em { color: #245787; font-size: 13px; font-style: normal; font-weight: 700; }
+.dormitory-layout .fp-beds button {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  text-align: left;
+}
+.dormitory-layout .fp-beds button small {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--d86-text-2);
+  font-size: 10px;
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .dormitory-layout .fp-fulong-floor {
   display: grid;
   grid-template-columns: 40px minmax(1040px, 1fr);

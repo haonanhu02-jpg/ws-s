@@ -24,14 +24,14 @@ final class EmployeeDormitoryModels {
  record FeeBill(Long id,Long roomId,String buildingName,String roomNo,String billingMonth,String occupantNames,BigDecimal waterUsage,BigDecimal electricUsage,BigDecimal waterPrice,BigDecimal electricPrice,BigDecimal freeWater,BigDecimal freeElectric,BigDecimal waterAmount,BigDecimal electricAmount,BigDecimal adjustment,BigDecimal totalAmount,String status,String remark,String operatorName,Instant updatedAt) {}
  record BuildingNode(Building building,List<Room> rooms) {}
  record Person(Long id,String name,String centerName,String department,String gender,String category,String positionName,String rankName) {}
- record Stay(Long id,Person person,Bed bed,StayStatus status,String applicationCode,String liaison,String bedType,boolean costCut,Boolean promiseSigned,BigDecimal moveInWater,BigDecimal moveInElectric,BigDecimal moveOutWater,BigDecimal moveOutElectric,LocalDate plannedMoveIn,LocalDate plannedMoveOut,Instant checkedInAt,Instant checkedOutAt,String specialNote,String remark,long version) {}
+ record Stay(Long id,Person person,Bed bed,StayStatus status,String applicationCode,String liaison,String bedType,String threePiece,boolean costCut,Boolean promiseSigned,BigDecimal moveInWater,BigDecimal moveInElectric,BigDecimal moveOutWater,BigDecimal moveOutElectric,LocalDate plannedMoveIn,LocalDate plannedMoveOut,Instant checkedInAt,Instant checkedOutAt,String specialNote,String remark,long version) {}
 
  record BuildingCommand(@NotBlank String name,@NotBlank String regionName,Boolean enabled,Integer displayOrder) {}
  record RoomCommand(@NotNull Long buildingId,@NotBlank String roomNo,@NotNull Integer floorNo,String facing,@NotBlank String roomType,Boolean livable,Boolean cleaningRequired,Integer gridCol,Integer gridRow,Integer gridColSpan,Integer gridRowSpan,Integer displayOrder,String specialNote,Boolean enabled) {}
  record BedCommand(@NotNull Long roomId,@NotBlank String label,@NotBlank String bedCode,String threePiece,Boolean enabled) {}
- record PersonCommand(@NotBlank String name,String centerName,@NotBlank String department,@Pattern(regexp="男|女") String gender,@NotBlank String category,String positionName,String rankName) {}
+ record PersonCommand(@NotBlank String name,String centerName,@NotBlank String department,@Pattern(regexp="男|女") String gender,String category,String positionName,String rankName) {}
  record ResourceImportCommand(@NotBlank String buildingName,@NotBlank String regionName,@NotBlank String roomNo,@NotNull Integer floorNo,String facing,@NotBlank String roomType,@NotBlank String bedLabel,@NotBlank String bedCode,String threePiece) {}
- record BookCommand(@NotNull Long personId,@NotNull Long bedId,String applicationCode,String liaison,@NotBlank String bedType,@NotNull Boolean costCut,Boolean promiseSigned,BigDecimal moveInWater,BigDecimal moveInElectric,@NotNull LocalDate plannedMoveIn,LocalDate plannedMoveOut,String specialNote,String remark) {}
+ record BookCommand(@NotNull Long personId,@NotNull Long bedId,String applicationCode,String liaison,@NotBlank String bedType,String threePiece,@NotNull Boolean costCut,Boolean promiseSigned,BigDecimal moveInWater,BigDecimal moveInElectric,@NotNull LocalDate plannedMoveIn,LocalDate plannedMoveOut,String specialNote,String remark) {}
  record TransferCommand(@NotNull Long bedId,String reason) {}
  record ExtendCommand(@NotNull LocalDate plannedMoveOut,String reason) {}
  record CheckoutCommand(@PositiveOrZero BigDecimal moveOutWater,@PositiveOrZero BigDecimal moveOutElectric,String reason) {}
