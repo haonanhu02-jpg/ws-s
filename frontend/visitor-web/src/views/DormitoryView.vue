@@ -1901,14 +1901,21 @@ onMounted(load);
           ><label>入住时电费度数<input v-model="form.moveInElectric" type="number" min="0" step="0.01" /></label
           ><label>退房时水费度数<input v-model="form.moveOutWater" type="number" min="0" step="0.01" /></label
           ><label>退房时电费度数<input v-model="form.moveOutElectric" type="number" min="0" step="0.01" /></label
-          ><label class="choice"
-            ><input v-model="form.costCut" type="checkbox" /> 纳入降本</label
-          ><label class="choice"
-            ><input v-model="form.promiseSigned" type="checkbox" />
-            已签承诺书</label
-          ><label class="choice"
-            ><input v-model="form.cleaningRequired" type="checkbox" />
-            待打扫</label
+          ><label
+            >是否纳入降本 *<select v-model="form.costCut" required>
+              <option :value="true">是</option>
+              <option :value="false">否</option>
+            </select></label
+          ><label
+            >是否已签承诺书 *<select v-model="form.promiseSigned" required>
+              <option :value="true">是</option>
+              <option :value="false">否</option>
+            </select></label
+          ><label
+            >是否待打扫 *<select v-model="form.cleaningRequired" required>
+              <option :value="true">是</option>
+              <option :value="false">否</option>
+            </select></label
           ><label class="wide">特殊说明<textarea v-model.trim="form.specialNote" rows="2" /></label
           ><label class="wide"
             >备注<textarea v-model.trim="form.remark" rows="2" />
