@@ -274,10 +274,16 @@ function bedDisplayName(bed: Bed): string {
     const room = node.rooms.find((item) => item.id === bed.roomId);
     if (room) {
       const index = room.beds.findIndex((item) => item.id === bed.id);
-      return `${node.building.name}-${room.roomNo}-${Math.max(0, index) + 1}号床`;
+      const storedLabel = bed.label?.trim();
+      const label = room.roomType === "单间"
+        ? "单床"
+        : storedLabel === "靠窗" || storedLabel === "靠门"
+          ? storedLabel
+          : index === 0 ? "靠窗" : "靠门";
+      return `${node.building.name}-${room.roomNo}-${label}`;
     }
   }
-  return bed.bedCode.replace(/靠窗|靠门|单床/g, "床位");
+  return bed.bedCode;
 }
 const selectedBedName = computed(() => selectedBed.value ? bedDisplayName(selectedBed.value) : "");
 const selectedBedReservations = computed(() => selectedBed.value
@@ -788,7 +794,7 @@ function toggleClean(r: Room) {
 function addBed(r: Room) {
   openResource("bed", {
     roomId: r.id,
-    label: `${r.beds.length + 1}号床`,
+    label: r.roomType === "单间" ? "单床" : r.beds.length === 0 ? "靠窗" : "靠门",
     bedCode: "",
     threePiece: "",
     enabled: true,
@@ -1086,7 +1092,7 @@ async function downloadImportTemplate(kind: "people" | "resources" | "stays") {
       "床位编码",
       "三件套",
     ],
-    [["1号楼", "总部", "101", 1, "南", "标间", "1号床", "1-101-A", "公司提供"]],
+    [["盛心公寓", "总部", "202", 2, "北", "标间", "靠窗", "盛心公寓-202-靠窗", "公司提供"]],
   );
   const node = shownBuildings.value[0];
   const room = node?.rooms.find((item) => item.livable && item.beds.length);
