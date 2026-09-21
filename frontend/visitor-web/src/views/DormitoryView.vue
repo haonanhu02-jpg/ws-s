@@ -1049,7 +1049,7 @@ function stayLocation(stay: Stay) {
   return { buildingName: "", roomNo: "" };
 }
 const FULL_STAY_HEADERS = [
-  "姓名", "中心", "部门", "性别", "人员类别", "岗位", "职级", "楼栋名称", "房号", "床位编码",
+  "房号", "姓名", "中心", "部门", "性别", "人员类别", "岗位", "职级", "楼栋名称", "床位编码",
   "申请单编码", "对接人", "床位类型", "三件套", "三件套说明", "是否纳入降本", "已签承诺书",
   "入住时水费度数", "入住时电费度数", "退房时水费度数", "退房时电费度数", "待打扫",
   "计划入住", "计划退宿", "特殊说明", "备注",
@@ -1057,8 +1057,8 @@ const FULL_STAY_HEADERS = [
 const FULL_STAY_EXPORT_HEADERS = [...FULL_STAY_HEADERS, "当前状态", "实际入住时间", "实际退宿时间"];
 function fullStayRow(stay: Stay): (string | number | boolean | null | undefined)[] {
   const location = stayLocation(stay);
-  return [stay.person.name, stay.person.centerName, stay.person.department, stay.person.gender, stay.person.category,
-    stay.person.positionName, stay.person.rankName, location.buildingName, location.roomNo, stay.bed.bedCode,
+  return [location.roomNo, stay.person.name, stay.person.centerName, stay.person.department, stay.person.gender, stay.person.category,
+    stay.person.positionName, stay.person.rankName, location.buildingName, stay.bed.bedCode,
     stay.applicationCode, stay.liaison, stay.bedType, stay.threePiece, stay.threePieceNote,
     stay.costCut ? "是" : "否", stay.promiseSigned ? "是" : "否", stay.moveInWater, stay.moveInElectric,
     stay.moveOutWater, stay.moveOutElectric, stay.cleaningRequired ? "是" : "否", stay.plannedMoveIn,
@@ -1106,8 +1106,8 @@ async function downloadImportTemplate(kind: "people" | "resources" | "stays") {
   const bed = room?.beds[0];
   const scope = selectedBuilding.value ? node?.building.name || "所选楼栋" : "全集团";
   return exportWorkbook(`${scope}_完整入住导入模板`, "完整入住数据", FULL_STAY_HEADERS, [[
-    "张三", "制造中心", "生产部", "男", "新员工(普通)", "操作工", "P1", node?.building.name || "盛心公寓",
-    room?.roomNo || "201", bed?.bedCode || "BED-201-A", "AP-001", "王主管", "过渡房", "公司提供", "枕套待补",
+    room?.roomNo || "201", "张三", "制造中心", "生产部", "男", "新员工(普通)", "操作工", "P1", node?.building.name || "盛心公寓",
+    bed?.bedCode || "BED-201-A", "AP-001", "王主管", "过渡房", "公司提供", "枕套待补",
     "否", "是", 0, 0, "", "", "否", today(), "", "", "",
   ]]);
 }
@@ -1115,7 +1115,7 @@ function excelBoolean(value: string): boolean { return ["是", "true", "1", "已
 function excelNumber(value: string): number | null { return value === "" ? null : Number(value); }
 function validateStayImportRows(rows: string[][]): void {
   const issues: string[] = [];
-  const required = [[0, "姓名"], [2, "部门"], [3, "性别"], [7, "楼栋名称"], [8, "房号"], [9, "床位编码"], [12, "床位类型"], [15, "是否纳入降本"], [22, "计划入住"]] as const;
+  const required = [[0, "房号"], [1, "姓名"], [3, "部门"], [4, "性别"], [8, "楼栋名称"], [9, "床位编码"], [12, "床位类型"], [15, "是否纳入降本"], [22, "计划入住"]] as const;
   const numberColumns = [[17, "入住时水费度数"], [18, "入住时电费度数"], [19, "退房时水费度数"], [20, "退房时电费度数"]] as const;
   const yesNoColumns = [[15, "是否纳入降本"], [16, "已签承诺书"], [21, "待打扫"]] as const;
   const isoDate = /^\d{4}-\d{2}-\d{2}$/;
@@ -1126,7 +1126,7 @@ function validateStayImportRows(rows: string[][]): void {
     required.forEach(([column, label]) => {
       if (!row[column]?.trim()) issue(excelRow, label, row[column], "必填项未填写", "不能为空");
     });
-    if (row[3] && !["男", "女"].includes(row[3])) issue(excelRow, "性别", row[3], "选项不符合要求", "填写“男”或“女”");
+    if (row[4] && !["男", "女"].includes(row[4])) issue(excelRow, "性别", row[4], "选项不符合要求", "填写“男”或“女”");
     if (row[13] && !["自带", "公司提供"].includes(row[13])) issue(excelRow, "三件套", row[13], "选项不符合要求", "填写“自带”或“公司提供”，也可以留空");
     yesNoColumns.forEach(([column, label]) => {
       if (row[column] && !["是", "否"].includes(row[column])) issue(excelRow, label, row[column], "选项不符合要求", "填写“是”或“否”");
@@ -1201,11 +1201,11 @@ async function chooseImport(kind: "people" | "resources" | "stays") {
         if (misplacedHeaders.length) throw new Error(`导入模板字段顺序不正确：\n• ${misplacedHeaders.join("\n• ")}\n请使用“下载完整模板”生成的模板填写。`);
         validateStayImportRows(clean);
         const allowedBuilding = selectedBuilding.value ? shownBuildings.value[0]?.building.name : null;
-        const outOfScopeRows = clean.map((row, index) => row[7] !== allowedBuilding && allowedBuilding ? index + 2 : 0).filter(Boolean);
+        const outOfScopeRows = clean.map((row, index) => row[8] !== allowedBuilding && allowedBuilding ? index + 2 : 0).filter(Boolean);
         if (allowedBuilding && outOfScopeRows.length) throw new Error(`当前范围为${allowedBuilding}，第${outOfScopeRows.join("、")}行填写了其他宿舍`);
         const summary = await dormitoryApi.importStays(clean.map((r) => ({
-          name:r[0],centerName:r[1],department:r[2],gender:r[3],category:r[4],positionName:r[5],rankName:r[6],
-          buildingName:r[7],roomNo:r[8],bedCode:r[9],applicationCode:r[10],liaison:r[11],bedType:r[12],
+          name:r[1],centerName:r[2],department:r[3],gender:r[4],category:r[5],positionName:r[6],rankName:r[7],
+          buildingName:r[8],roomNo:r[0],bedCode:r[9],applicationCode:r[10],liaison:r[11],bedType:r[12],
           threePiece:r[13]||null,threePieceNote:r[14]||null,costCut:excelBoolean(r[15]),promiseSigned:excelBoolean(r[16]),
           moveInWater:excelNumber(r[17]),moveInElectric:excelNumber(r[18]),moveOutWater:excelNumber(r[19]),moveOutElectric:excelNumber(r[20]),
           cleaningRequired:excelBoolean(r[21]),plannedMoveIn:r[22],plannedMoveOut:r[23]||null,specialNote:r[24]||null,remark:r[25]||null,
