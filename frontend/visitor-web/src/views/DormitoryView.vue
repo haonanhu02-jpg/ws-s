@@ -910,6 +910,46 @@ async function exportWorkbook(
       Math.max(12, ...rows.map((r) => String(r[index] ?? "").length + 2)),
     );
   });
+  if (filename.includes("完整入住导入模板")) {
+    const column = (name: string) => headers.indexOf(name) + 1;
+    const requiredHeaders = ["房号", "姓名", "楼栋名称", "床位编码", "床位类型", "计划入住"];
+    requiredHeaders.forEach((name) => {
+      const cell = sheet.getCell(1, column(name));
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFD9D5" } };
+      cell.note = `${name}为必填项`;
+    });
+    const lists: Record<string, string[]> = {
+      性别: ["男", "女"],
+      人员类别: [...PERSON_CATEGORIES],
+      三件套: [...THREE_PIECE_OPTIONS],
+      是否纳入降本: ["是", "否"],
+      已签承诺书: ["是", "否"],
+      待打扫: ["是", "否"],
+    };
+    Object.entries(lists).forEach(([name, values]) => {
+      const columnNumber = column(name);
+      for (let row = 2; row <= 500; row += 1) sheet.getCell(row, columnNumber).dataValidation = {
+        type: "list", allowBlank: true, formulae: [`"${values.join(",")}"`],
+        showErrorMessage: true, errorTitle: `${name}填写错误`, error: `请从下拉列表选择：${values.join("、")}`,
+      };
+    });
+    ["计划入住", "计划退宿"].forEach((name) => {
+      const columnNumber = column(name);
+      for (let row = 2; row <= 500; row += 1) sheet.getCell(row, columnNumber).numFmt = "yyyy-mm-dd";
+    });
+    const instructions = workbook.addWorksheet("填写说明");
+    instructions.addRows([
+      ["字段", "填写要求"],
+      ["红色表头", "必填项，不能为空"],
+      ["部门", "允许留空；导入后按“未填写”保存"],
+      ["性别", "允许留空；填写时请从“男/女”中选择"],
+      ["是否纳入降本、已签承诺书、待打扫", "允许留空，留空按“否”处理"],
+      ["计划入住、计划退宿", "可使用Excel日期或YYYY-MM-DD；计划入住必填，计划退宿可留空"],
+      ["水电度数", "填写大于或等于0的数字，也可以留空"],
+    ]);
+    instructions.getRow(1).font = { bold: true };
+    instructions.columns = [{ width: 34 }, { width: 78 }];
+  }
   const buffer = await workbook.xlsx.writeBuffer();
   const link = document.createElement("a");
   link.href = URL.createObjectURL(
@@ -1113,9 +1153,22 @@ async function downloadImportTemplate(kind: "people" | "resources" | "stays") {
 }
 function excelBoolean(value: string): boolean { return ["是", "true", "1", "已勾选"].includes(value.toLowerCase()); }
 function excelNumber(value: string): number | null { return value === "" ? null : Number(value); }
+function excelCellText(value: unknown, columnIndex: number): string {
+  const formatDate = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  if (value instanceof Date) return formatDate(value);
+  if ((columnIndex === 22 || columnIndex === 23) && typeof value === "number" && value > 20000 && value < 80000)
+    return new Date(Math.round((value - 25569) * 86400 * 1000)).toISOString().slice(0, 10);
+  if (value && typeof value === "object") {
+    const cell = value as { result?: unknown; text?: string; richText?: { text: string }[] };
+    if (cell.result !== undefined) return excelCellText(cell.result, columnIndex);
+    if (cell.text !== undefined) return cell.text.trim();
+    if (cell.richText) return cell.richText.map((part) => part.text).join("").trim();
+  }
+  return String(value ?? "").trim();
+}
 function validateStayImportRows(rows: string[][]): void {
   const issues: string[] = [];
-  const required = [[0, "房号"], [1, "姓名"], [3, "部门"], [4, "性别"], [8, "楼栋名称"], [9, "床位编码"], [12, "床位类型"], [15, "是否纳入降本"], [22, "计划入住"]] as const;
+  const required = [[0, "房号"], [1, "姓名"], [8, "楼栋名称"], [9, "床位编码"], [12, "床位类型"], [22, "计划入住"]] as const;
   const numberColumns = [[17, "入住时水费度数"], [18, "入住时电费度数"], [19, "退房时水费度数"], [20, "退房时电费度数"]] as const;
   const yesNoColumns = [[15, "是否纳入降本"], [16, "已签承诺书"], [21, "待打扫"]] as const;
   const isoDate = /^\d{4}-\d{2}-\d{2}$/;
@@ -1160,7 +1213,7 @@ async function chooseImport(kind: "people" | "resources" | "stays") {
           rows.push(
             (row.values as unknown[])
               .slice(1)
-              .map((v) => String(v ?? "").trim()),
+              .map((value, columnIndex) => excelCellText(value, columnIndex)),
           );
       });
       const clean = rows.filter((r) => r.some(Boolean));
@@ -1204,7 +1257,7 @@ async function chooseImport(kind: "people" | "resources" | "stays") {
         const outOfScopeRows = clean.map((row, index) => row[8] !== allowedBuilding && allowedBuilding ? index + 2 : 0).filter(Boolean);
         if (allowedBuilding && outOfScopeRows.length) throw new Error(`当前范围为${allowedBuilding}，第${outOfScopeRows.join("、")}行填写了其他宿舍`);
         const summary = await dormitoryApi.importStays(clean.map((r) => ({
-          name:r[1],centerName:r[2],department:r[3],gender:r[4],category:r[5],positionName:r[6],rankName:r[7],
+          name:r[1],centerName:r[2],department:r[3]||"未填写",gender:r[4]||null,category:r[5],positionName:r[6],rankName:r[7],
           buildingName:r[8],roomNo:r[0],bedCode:r[9],applicationCode:r[10],liaison:r[11],bedType:r[12],
           threePiece:r[13]||null,threePieceNote:r[14]||null,costCut:excelBoolean(r[15]),promiseSigned:excelBoolean(r[16]),
           moveInWater:excelNumber(r[17]),moveInElectric:excelNumber(r[18]),moveOutWater:excelNumber(r[19]),moveOutElectric:excelNumber(r[20]),
@@ -1493,7 +1546,7 @@ onMounted(load);
           </div></template
         >
         <template v-else-if="!loading && active === 'ledger'"
-          ><div class="ledger-heading"><div><span class="section-kicker">住宿业务</span><h2>入住人员台账</h2><p>顶部选择“全集团”或具体宿舍后，可分别导出全部历史明细或当前在住及预订人员。</p></div><div class="ledger-heading-right"><div class="ledger-heading-actions"><button class="secondary-button" @click="exportFullStays">导出全部历史明细</button><button class="secondary-button" @click="exportLedger">导出当前在住及预订</button><button class="secondary-button" @click="downloadImportTemplate('stays')">下载完整模板</button><button class="secondary-button" @click="chooseImport('stays')">导入入住数据</button><button class="secondary-button" @click="exportPeople">导出人员档案</button></div><div class="ledger-count"><b>{{ shownStays.length }}</b><span>{{ selectedBuilding ? '当前宿舍' : '全集团' }}</span></div></div></div>
+          ><div class="ledger-heading"><div><span class="section-kicker">住宿业务</span><h2>入住人员台账</h2></div><div class="ledger-heading-right"><div class="ledger-heading-actions"><button class="secondary-button" @click="exportFullStays">导出全部历史明细</button><button class="secondary-button" @click="exportLedger">导出当前在住及预订</button><button class="secondary-button" @click="downloadImportTemplate('stays')">下载完整模板</button><button class="secondary-button" @click="chooseImport('stays')">导入入住数据</button><button class="secondary-button" @click="exportPeople">导出人员档案</button></div><div class="ledger-count"><b>{{ shownStays.length }}</b><span>{{ selectedBuilding ? '当前宿舍' : '全集团' }}</span></div></div></div>
           <div class="ledger-toolbar"><label><span>搜索台账</span><input v-model.trim="ledgerSearch" placeholder="输入姓名、部门、床位或状态" /></label><div class="ledger-legend"><span><i class="dot booked"></i>已预订</span><span><i class="dot living"></i>已入住</span><span><i class="dot done"></i>已退宿</span></div></div>
           <div class="table-wrap">
             <table>
