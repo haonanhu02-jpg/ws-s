@@ -1152,8 +1152,8 @@ async function downloadImportTemplate(kind: "people" | "resources" | "stays") {
     "否", "是", 0, 0, "", "", "否", today(), "", "", "",
   ]]);
 }
-function excelBoolean(value: string): boolean { return ["是", "true", "1", "已勾选"].includes(value.toLowerCase()); }
-function excelNumber(value: string): number | null { return value === "" ? null : Number(value); }
+function excelBoolean(value: string | undefined): boolean { return ["是", "true", "1", "已勾选"].includes(String(value ?? "").toLowerCase()); }
+function excelNumber(value: string | undefined): number | null { return value == null || value === "" ? null : Number(value); }
 function excelCellText(value: unknown, columnIndex: number): string {
   const formatDate = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
   if (value instanceof Date) return formatDate(value);
@@ -1571,7 +1571,7 @@ onMounted(load);
                   <td>{{ s.person.gender }}</td>
                   <td>{{ bedDisplayName(s.bed) }}</td>
                   <td>{{ s.threePiece || "-" }}</td>
-                  <td><span :class="['ledger-status', s.status.toLowerCase()]">{{ statusLabel(s.status) }}</span></td>
+                  <td><span :class="['ledger-status', (s.status || '').toLowerCase()]">{{ statusLabel(s.status) }}</span></td>
                   <td>{{ s.plannedMoveIn }}</td>
                   <td>{{ s.plannedMoveOut || "-" }}</td>
                   <td class="stay-actions">
