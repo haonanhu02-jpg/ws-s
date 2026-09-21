@@ -45,6 +45,8 @@
 - `POST /stays/{id}/extend`
 - `POST /stays/{id}/check-out`
 - `POST /stays/{id}/cancel`
+- `DELETE /stays/{id}`（仅允许永久删除已取消或已退宿记录，同时清理附件与住宿操作明细）
+- `DELETE /people/{id}`（仅允许删除不存在任何住宿记录的人员档案）
 - `GET /stay-audits`
 - `GET /resource-audits`
 - `GET /meter-readings?month=YYYY-MM`

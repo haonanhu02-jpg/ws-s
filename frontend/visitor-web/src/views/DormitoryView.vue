@@ -1018,6 +1018,18 @@ function exportMeters() {
     ]),
   );
 }
+async function deleteStay(s: Stay) {
+  if (!confirm(`确认永久删除 ${s.person.name} 的这条${statusLabel(s.status)}住宿记录？删除后无法恢复。`)) return;
+  await resourceAction(() => dormitoryApi.deleteStay(s.id), "住宿记录已删除");
+}
+async function deletePerson(p: Person) {
+  if (!confirm(`确认永久删除人员档案“${p.name}”？仅无住宿记录的人员可以删除。`)) return;
+  await resourceAction(() => dormitoryApi.deletePerson(p.id), "人员档案已删除");
+  if (!error.value && selectedPerson.value?.id === p.id) {
+    selectedPerson.value = null;
+    personHistory.value = [];
+  }
+}
 function stayLocation(stay: Stay) {
   for (const node of buildings.value) {
     const room = node.rooms.find((item) => item.id === stay.bed.roomId);
@@ -1497,6 +1509,11 @@ onMounted(load);
                       打印
                     </button>
                     <button class="secondary" @click="openAttachments(s)">附件</button>
+                    <button
+                      v-if="s.status === 'CANCELLED' || s.status === 'CHECKED_OUT'"
+                      class="secondary danger-text"
+                      @click="deleteStay(s)"
+                    >删除</button>
                   </td>
                 </tr>
                 <tr v-if="!filteredStays.length">
@@ -1547,6 +1564,7 @@ onMounted(load);
                     ><button class="secondary" @click="showPersonHistory(p)">
                       住宿历史
                     </button>
+                    <button class="secondary danger-text" @click="deletePerson(p)">删除</button>
                   </td>
                 </tr>
                 <tr v-if="!filteredPeople.length">

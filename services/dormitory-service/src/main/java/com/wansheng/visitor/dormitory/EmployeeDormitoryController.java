@@ -32,6 +32,7 @@ class EmployeeDormitoryController {
  @GetMapping("/people") List<Person> people(@RequestParam(required=false)String name){return service.people(name);}
  @PostMapping("/people") Person addPerson(@Valid @RequestBody PersonCommand c){return service.addPerson(c);}
  @PutMapping("/people/{id}") Person updatePerson(@PathVariable long id,@Valid @RequestBody PersonCommand c){return service.updatePerson(id,c);}
+ @DeleteMapping("/people/{id}") @ResponseStatus(HttpStatus.NO_CONTENT) void deletePerson(@PathVariable long id,Principal p){service.deletePerson(id,p.getName());}
  @PostMapping("/imports/people") ImportSummary importPeople(@Valid @RequestBody List<@Valid PersonCommand> commands,Principal p){return service.importPeople(commands,p.getName());}
  @PostMapping("/imports/resources") ImportSummary importResources(@Valid @RequestBody List<@Valid ResourceImportCommand> commands,Principal p){return service.importResources(commands,p.getName());}
  @PostMapping("/imports/stays") StayImportSummary importStays(@Valid @RequestBody List<@Valid StayImportCommand> commands,Principal p){return service.importStays(commands,p.getName());}
@@ -45,6 +46,7 @@ class EmployeeDormitoryController {
  @PostMapping("/stays/{id}/extend") Stay extend(@PathVariable long id,@Valid @RequestBody ExtendCommand c,Principal p){return service.extend(id,c,p.getName());}
  @PostMapping("/stays/{id}/check-out") Stay checkout(@PathVariable long id,@Valid @RequestBody CheckoutCommand c,Principal p){return service.checkout(id,c,p.getName());}
  @PostMapping("/stays/{id}/cancel") Stay cancel(@PathVariable long id,Principal p){return service.cancel(id,p.getName());}
+ @DeleteMapping("/stays/{id}") @ResponseStatus(HttpStatus.NO_CONTENT) void deleteStay(@PathVariable long id,Principal p){extension.deleteStay(id,p.getName());}
  @GetMapping("/stays/{id}/attachments") List<StayAttachment> attachments(@PathVariable long id){return extension.attachments(id);}
  @PostMapping(value="/stays/{id}/attachments",consumes=MediaType.MULTIPART_FORM_DATA_VALUE) StayAttachment upload(@PathVariable long id,@RequestParam(defaultValue="OTHER")String type,@RequestPart MultipartFile file,Principal p){return extension.upload(id,type,file,p.getName());}
  @GetMapping("/attachments/{id}/download") ResponseEntity<Resource> download(@PathVariable long id){var d=extension.download(id);return ResponseEntity.ok().contentType(MediaType.parseMediaType(d.metadata().contentType())).contentLength(d.metadata().fileSize()).header(HttpHeaders.CONTENT_DISPOSITION,ContentDisposition.attachment().filename(d.metadata().originalName(),StandardCharsets.UTF_8).build().toString()).body(d.resource());}
