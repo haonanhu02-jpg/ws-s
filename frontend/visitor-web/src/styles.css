@@ -767,6 +767,15 @@ tbody tr:hover { background: var(--d86-brand-soft); }
   align-items: flex-start;
   justify-content: center;
   text-align: left;
+  gap: 1px;
+  min-height: 54px;
+  line-height: 1.25;
+}
+.dormitory-layout .fp-beds button b {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .dormitory-layout .fp-beds button small {
   max-width: 100%;
