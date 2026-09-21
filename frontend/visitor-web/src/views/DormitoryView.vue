@@ -912,7 +912,7 @@ async function exportWorkbook(
   });
   if (filename.includes("完整入住导入模板")) {
     const column = (name: string) => headers.indexOf(name) + 1;
-    const requiredHeaders = ["房号", "姓名", "楼栋名称", "床位编码", "床位类型", "计划入住"];
+    const requiredHeaders = ["房号", "楼栋名称", "床位编码", "床位类型"];
     requiredHeaders.forEach((name) => {
       const cell = sheet.getCell(1, column(name));
       cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFD9D5" } };
@@ -944,7 +944,8 @@ async function exportWorkbook(
       ["部门", "允许留空；导入后按“未填写”保存"],
       ["性别", "允许留空；填写时请从“男/女”中选择"],
       ["是否纳入降本、已签承诺书、待打扫", "允许留空，留空按“否”处理"],
-      ["计划入住、计划退宿", "可使用Excel日期或YYYY-MM-DD；计划入住必填，计划退宿可留空"],
+      ["姓名", "允许留空；导入后按“未填写”保存"],
+      ["计划入住、计划退宿", "允许留空；可使用Excel日期或YYYY-MM-DD，计划入住留空时按导入当天处理"],
       ["水电度数", "填写大于或等于0的数字，也可以留空"],
     ]);
     instructions.getRow(1).font = { bold: true };
@@ -1168,7 +1169,7 @@ function excelCellText(value: unknown, columnIndex: number): string {
 }
 function validateStayImportRows(rows: string[][]): void {
   const issues: string[] = [];
-  const required = [[0, "房号"], [1, "姓名"], [8, "楼栋名称"], [9, "床位编码"], [12, "床位类型"], [22, "计划入住"]] as const;
+  const required = [[0, "房号"], [8, "楼栋名称"], [9, "床位编码"], [12, "床位类型"]] as const;
   const numberColumns = [[17, "入住时水费度数"], [18, "入住时电费度数"], [19, "退房时水费度数"], [20, "退房时电费度数"]] as const;
   const yesNoColumns = [[15, "是否纳入降本"], [16, "已签承诺书"], [21, "待打扫"]] as const;
   const isoDate = /^\d{4}-\d{2}-\d{2}$/;
@@ -1257,11 +1258,11 @@ async function chooseImport(kind: "people" | "resources" | "stays") {
         const outOfScopeRows = clean.map((row, index) => row[8] !== allowedBuilding && allowedBuilding ? index + 2 : 0).filter(Boolean);
         if (allowedBuilding && outOfScopeRows.length) throw new Error(`当前范围为${allowedBuilding}，第${outOfScopeRows.join("、")}行填写了其他宿舍`);
         const summary = await dormitoryApi.importStays(clean.map((r) => ({
-          name:r[1],centerName:r[2],department:r[3]||"未填写",gender:r[4]||null,category:r[5],positionName:r[6],rankName:r[7],
+          name:r[1]||"未填写",centerName:r[2],department:r[3]||"未填写",gender:r[4]||null,category:r[5],positionName:r[6],rankName:r[7],
           buildingName:r[8],roomNo:r[0],bedCode:r[9],applicationCode:r[10],liaison:r[11],bedType:r[12],
           threePiece:r[13]||null,threePieceNote:r[14]||null,costCut:excelBoolean(r[15]),promiseSigned:excelBoolean(r[16]),
           moveInWater:excelNumber(r[17]),moveInElectric:excelNumber(r[18]),moveOutWater:excelNumber(r[19]),moveOutElectric:excelNumber(r[20]),
-          cleaningRequired:excelBoolean(r[21]),plannedMoveIn:r[22],plannedMoveOut:r[23]||null,specialNote:r[24]||null,remark:r[25]||null,
+          cleaningRequired:excelBoolean(r[21]),plannedMoveIn:r[22]||today(),plannedMoveOut:r[23]||null,specialNote:r[24]||null,remark:r[25]||null,
         })));
         message.value = `入住数据导入完成：新增住宿 ${summary.staysCreated}、新增人员 ${summary.peopleCreated}`;
         if (summary.skipped.length) error.value = `以下${summary.skipped.length}条数据未导入：\n• ${summary.skipped.join("\n• ")}\n请根据提示修正后重新导入。`;
