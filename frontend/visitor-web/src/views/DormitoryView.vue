@@ -922,9 +922,14 @@ async function exportWorkbook(
   setTimeout(() => URL.revokeObjectURL(link.href), 1000);
 }
 function exportLedger() {
+  const scope = selectedBuilding.value ? shownBuildings.value[0]?.building.name || "所选宿舍" : "全集团";
+  const currentStays = shownStays.value.filter((stay) => {
+    const status = effectiveStayStatus(stay);
+    return status === "BOOKED" || status === "CHECKED_IN";
+  });
   return exportWorkbook(
-    "入住台账",
-    "入住台账",
+    `${scope}_当前在住及预订人员台账`,
+    "当前人员台账",
     [
       "姓名",
       "中心",
@@ -937,7 +942,7 @@ function exportLedger() {
       "计划入住",
       "计划退宿",
     ],
-    shownStays.value.map((s) => [
+    currentStays.map((s) => [
       s.person.name,
       s.person.centerName,
       s.person.department,
@@ -1049,6 +1054,7 @@ const FULL_STAY_HEADERS = [
   "入住时水费度数", "入住时电费度数", "退房时水费度数", "退房时电费度数", "待打扫",
   "计划入住", "计划退宿", "特殊说明", "备注",
 ];
+const FULL_STAY_EXPORT_HEADERS = [...FULL_STAY_HEADERS, "当前状态", "实际入住时间", "实际退宿时间"];
 function fullStayRow(stay: Stay): (string | number | boolean | null | undefined)[] {
   const location = stayLocation(stay);
   return [stay.person.name, stay.person.centerName, stay.person.department, stay.person.gender, stay.person.category,
@@ -1059,8 +1065,9 @@ function fullStayRow(stay: Stay): (string | number | boolean | null | undefined)
     stay.plannedMoveOut, stay.specialNote, stay.remark];
 }
 function exportFullStays() {
-  const scope = selectedBuilding.value ? shownBuildings.value[0]?.building.name || "所选楼栋" : "全集团";
-  return exportWorkbook(`${scope}_完整入住数据`, "完整入住数据", FULL_STAY_HEADERS, shownStays.value.map(fullStayRow));
+  const scope = selectedBuilding.value ? shownBuildings.value[0]?.building.name || "所选宿舍" : "全集团";
+  return exportWorkbook(`${scope}_全部住宿历史明细台账`, "住宿历史明细", FULL_STAY_EXPORT_HEADERS,
+    shownStays.value.map((stay) => [...fullStayRow(stay), statusLabel(stay.status), localTime(stay.checkedInAt || ""), localTime(stay.checkedOutAt || "")]));
 }
 function exportFees() {
   return exportWorkbook(
@@ -1106,6 +1113,33 @@ async function downloadImportTemplate(kind: "people" | "resources" | "stays") {
 }
 function excelBoolean(value: string): boolean { return ["是", "true", "1", "已勾选"].includes(value.toLowerCase()); }
 function excelNumber(value: string): number | null { return value === "" ? null : Number(value); }
+function validateStayImportRows(rows: string[][]): void {
+  const issues: string[] = [];
+  const required = [[0, "姓名"], [2, "部门"], [3, "性别"], [7, "楼栋名称"], [8, "房号"], [9, "床位编码"], [12, "床位类型"], [15, "是否纳入降本"], [22, "计划入住"]] as const;
+  const numberColumns = [[17, "入住时水费度数"], [18, "入住时电费度数"], [19, "退房时水费度数"], [20, "退房时电费度数"]] as const;
+  const yesNoColumns = [[15, "是否纳入降本"], [16, "已签承诺书"], [21, "待打扫"]] as const;
+  const isoDate = /^\d{4}-\d{2}-\d{2}$/;
+  const issue = (excelRow: number, field: string, value: string, reason: string, requirement: string) =>
+    issues.push(`第${excelRow}行｜${field}｜当前值：${value || "（空白）"}｜原因：${reason}｜填写要求：${requirement}`);
+  rows.forEach((row, index) => {
+    const excelRow = index + 2;
+    required.forEach(([column, label]) => {
+      if (!row[column]?.trim()) issue(excelRow, label, row[column], "必填项未填写", "不能为空");
+    });
+    if (row[3] && !["男", "女"].includes(row[3])) issue(excelRow, "性别", row[3], "选项不符合要求", "填写“男”或“女”");
+    if (row[13] && !["自带", "公司提供"].includes(row[13])) issue(excelRow, "三件套", row[13], "选项不符合要求", "填写“自带”或“公司提供”，也可以留空");
+    yesNoColumns.forEach(([column, label]) => {
+      if (row[column] && !["是", "否"].includes(row[column])) issue(excelRow, label, row[column], "选项不符合要求", "填写“是”或“否”");
+    });
+    numberColumns.forEach(([column, label]) => {
+      if (row[column] && (!Number.isFinite(Number(row[column])) || Number(row[column]) < 0)) issue(excelRow, label, row[column], "不是有效的非负数", "填写大于或等于0的数字，也可以留空");
+    });
+    if (row[22] && !isoDate.test(row[22])) issue(excelRow, "计划入住", row[22], "日期格式不正确", "使用YYYY-MM-DD，例如2026-09-21");
+    if (row[23] && !isoDate.test(row[23])) issue(excelRow, "计划退宿", row[23], "日期格式不正确", "使用YYYY-MM-DD，例如2026-09-30；不确定时可以留空");
+    if (isoDate.test(row[22] || "") && isoDate.test(row[23] || "") && row[23] < row[22]) issue(excelRow, "计划退宿", row[23], "早于计划入住日期", `不得早于${row[22]}`);
+  });
+  if (issues.length) throw new Error(`台账导入校验失败，共${issues.length}项：\n• ${issues.slice(0, 20).join("\n• ")}${issues.length > 20 ? `\n• 另有${issues.length - 20}项错误，请先修正以上内容后重新导入` : ""}`);
+}
 async function chooseImport(kind: "people" | "resources" | "stays") {
   const input = document.createElement("input");
   input.type = "file";
@@ -1160,8 +1194,15 @@ async function chooseImport(kind: "people" | "resources" | "stays") {
             );
         message.value = `资源导入完成：楼栋 ${summary.buildingsCreated}、房间 ${summary.roomsCreated}、床位 ${summary.bedsCreated}，跳过 ${summary.skipped.length}`;
       } else {
+        const importedHeaders = ((sheet.getRow(1).values as unknown[]) || []).slice(1).map((value) => String(value ?? "").trim());
+        const missingHeaders = FULL_STAY_HEADERS.filter((header) => !importedHeaders.includes(header));
+        if (missingHeaders.length) throw new Error(`导入模板缺少字段：${missingHeaders.join("、")}`);
+        const misplacedHeaders = FULL_STAY_HEADERS.map((header, index) => importedHeaders[index] === header ? "" : `第${index + 1}列应为“${header}”，当前为“${importedHeaders[index] || "空白"}”`).filter(Boolean);
+        if (misplacedHeaders.length) throw new Error(`导入模板字段顺序不正确：\n• ${misplacedHeaders.join("\n• ")}\n请使用“下载完整模板”生成的模板填写。`);
+        validateStayImportRows(clean);
         const allowedBuilding = selectedBuilding.value ? shownBuildings.value[0]?.building.name : null;
-        if (allowedBuilding && clean.some((r) => r[7] !== allowedBuilding)) throw new Error(`当前范围为${allowedBuilding}，导入文件含有其他楼栋数据`);
+        const outOfScopeRows = clean.map((row, index) => row[7] !== allowedBuilding && allowedBuilding ? index + 2 : 0).filter(Boolean);
+        if (allowedBuilding && outOfScopeRows.length) throw new Error(`当前范围为${allowedBuilding}，第${outOfScopeRows.join("、")}行填写了其他宿舍`);
         const summary = await dormitoryApi.importStays(clean.map((r) => ({
           name:r[0],centerName:r[1],department:r[2],gender:r[3],category:r[4],positionName:r[5],rankName:r[6],
           buildingName:r[7],roomNo:r[8],bedCode:r[9],applicationCode:r[10],liaison:r[11],bedType:r[12],
@@ -1169,7 +1210,8 @@ async function chooseImport(kind: "people" | "resources" | "stays") {
           moveInWater:excelNumber(r[17]),moveInElectric:excelNumber(r[18]),moveOutWater:excelNumber(r[19]),moveOutElectric:excelNumber(r[20]),
           cleaningRequired:excelBoolean(r[21]),plannedMoveIn:r[22],plannedMoveOut:r[23]||null,specialNote:r[24]||null,remark:r[25]||null,
         })));
-        message.value = `入住数据导入完成：新增住宿 ${summary.staysCreated}、新增人员 ${summary.peopleCreated}，跳过 ${summary.skipped.length}`;
+        message.value = `入住数据导入完成：新增住宿 ${summary.staysCreated}、新增人员 ${summary.peopleCreated}`;
+        if (summary.skipped.length) error.value = `以下${summary.skipped.length}条数据未导入：\n• ${summary.skipped.join("\n• ")}\n请根据提示修正后重新导入。`;
       }
       await load();
     } catch (e) {
@@ -1451,7 +1493,7 @@ onMounted(load);
           </div></template
         >
         <template v-else-if="!loading && active === 'ledger'"
-          ><div class="ledger-heading"><div><span class="section-kicker">住宿业务</span><h2>入住人员台账</h2><p>集中查看预订、在住与退宿人员，导入导出范围跟随顶部当前楼栋或全集团。</p></div><div class="ledger-heading-right"><div class="ledger-heading-actions"><button class="secondary-button" @click="exportLedger">导出入住台账</button><button class="secondary-button" @click="exportFullStays">导出完整数据</button><button class="secondary-button" @click="downloadImportTemplate('stays')">下载完整模板</button><button class="secondary-button" @click="chooseImport('stays')">导入入住数据</button><button class="secondary-button" @click="exportPeople">导出人员档案</button></div><div class="ledger-count"><b>{{ shownStays.length }}</b><span>{{ selectedBuilding ? '当前楼栋' : '全集团' }}</span></div></div></div>
+          ><div class="ledger-heading"><div><span class="section-kicker">住宿业务</span><h2>入住人员台账</h2><p>顶部选择“全集团”或具体宿舍后，可分别导出全部历史明细或当前在住及预订人员。</p></div><div class="ledger-heading-right"><div class="ledger-heading-actions"><button class="secondary-button" @click="exportFullStays">导出全部历史明细</button><button class="secondary-button" @click="exportLedger">导出当前在住及预订</button><button class="secondary-button" @click="downloadImportTemplate('stays')">下载完整模板</button><button class="secondary-button" @click="chooseImport('stays')">导入入住数据</button><button class="secondary-button" @click="exportPeople">导出人员档案</button></div><div class="ledger-count"><b>{{ shownStays.length }}</b><span>{{ selectedBuilding ? '当前宿舍' : '全集团' }}</span></div></div></div>
           <div class="ledger-toolbar"><label><span>搜索台账</span><input v-model.trim="ledgerSearch" placeholder="输入姓名、部门、床位或状态" /></label><div class="ledger-legend"><span><i class="dot booked"></i>已预订</span><span><i class="dot living"></i>已入住</span><span><i class="dot done"></i>已退宿</span></div></div>
           <div class="table-wrap">
             <table>
