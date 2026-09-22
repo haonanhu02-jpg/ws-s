@@ -313,10 +313,20 @@ const alerts = computed(() => ({
   clean: buildings.value
     .flatMap((b) => b.rooms)
     .filter((r) => r.cleaningRequired),
+  bookedRooms: buildings.value
+    .flatMap((b) => b.rooms)
+    .filter((room) => room.beds.some((bed) => {
+      const stay = displayStayForBed(bed.id);
+      return stay && effectiveStayStatus(stay) === "BOOKED";
+    })),
   overdue: activeStays.value.filter(
     (s) =>
       s.plannedMoveOut &&
       s.plannedMoveOut <= new Date().toISOString().slice(0, 10),
+  ),
+  missingEmployeeApplication: activeStays.value.filter((stay) =>
+    ["已审批长住员工", "已审批长住人员", "己审批长住员工"].includes(stay.person.category || "")
+    && !stay.applicationCode?.trim(),
   ),
 }));
 type RoomState = "public" | "clean" | "live" | "book" | "ok";
@@ -1068,6 +1078,7 @@ function exportMeters() {
       "电表读数",
       "本月用电",
       "操作人",
+      "抄表日期",
     ],
     meterReadings.value.map((m) => [
       m.readingMonth,
@@ -1078,6 +1089,7 @@ function exportMeters() {
       m.electricEnd,
       usage(m.roomId, "electricEnd"),
       m.operatorName,
+      localTime(m.updatedAt || ""),
     ]),
   );
 }
@@ -1102,7 +1114,7 @@ function stayLocation(stay: Stay) {
 }
 const FULL_STAY_HEADERS = [
   "房号", "姓名", "中心", "部门", "性别", "人员类别", "岗位", "职级", "楼栋名称", "床位编码",
-  "申请单编码", "对接人", "床位类型", "三件套", "三件套说明", "是否纳入降本", "已签承诺书",
+  "员工入住申请单编码", "对接人", "床位类型", "三件套", "三件套说明", "是否纳入降本", "已签承诺书",
   "入住时水费度数", "入住时电费度数", "退房时水费度数", "退房时电费度数", "待打扫",
   "计划入住", "计划退宿", "特殊说明", "备注",
 ];
@@ -1303,7 +1315,7 @@ function printStay(stay: Stay, kind: "checkin" | "checkout") {
     ],
     ["人员类别", stay.person.category],
     ["床位", bedDisplayName(stay.bed)],
-    ["申请单编码", stay.applicationCode || "-"],
+    ["员工入住申请单编码", stay.applicationCode || "-"],
     ["对接人", stay.liaison || "-"],
     ["床位类型", stay.bedType],
     ["三件套", stay.threePiece || "-"],
@@ -1541,7 +1553,7 @@ onMounted(load);
           </div></template
         >
         <template v-else-if="!loading && active === 'dashboard'"
-          ><div class="section-hero"><div><span class="section-kicker">实时预警</span><h2>预警看板</h2><p>待打扫房间与退房提醒集中展示，请及时处理。</p></div></div>
+          ><div class="section-hero"><div><span class="section-kicker">实时预警</span><h2>预警看板</h2><p>待打扫、预定房间、退房及员工入住申请单编码提醒集中展示。</p></div></div>
           <div class="warning-columns">
             <article>
               <h3>待打扫（{{ alerts.clean.length }}）</h3>
@@ -1549,11 +1561,21 @@ onMounted(load);
               <p v-if="!alerts.clean.length" class="muted">暂无</p>
             </article>
             <article>
+              <h3>预定房间（{{ alerts.bookedRooms.length }}）</h3>
+              <p v-for="r in alerts.bookedRooms" :key="r.id">房号 {{ r.roomNo }}</p>
+              <p v-if="!alerts.bookedRooms.length" class="muted">暂无</p>
+            </article>
+            <article>
               <h3>退房提醒（{{ alerts.overdue.length }}）</h3>
               <p v-for="s in alerts.overdue" :key="s.id">
                 {{ s.person.name }} · {{ s.plannedMoveOut }}
               </p>
               <p v-if="!alerts.overdue.length" class="muted">暂无</p>
+            </article>
+            <article>
+              <h3>员工入住申请单编码（{{ alerts.missingEmployeeApplication.length }}）</h3>
+              <p v-for="s in alerts.missingEmployeeApplication" :key="s.id">{{ s.person.name }} · {{ s.bed.bedCode }}</p>
+              <p v-if="!alerts.missingEmployeeApplication.length" class="muted">暂无</p>
             </article>
           </div></template
         >
@@ -1754,7 +1776,7 @@ onMounted(load);
                     <th>本月用水</th>
                     <th>电表月末读数(度)</th>
                     <th>本月用电</th>
-                    <th>最后保存</th>
+                    <th>水电表抄表日期</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2019,7 +2041,7 @@ onMounted(load);
             </select></label
           ><label>三件套<select v-model="form.threePiece"><option value=""></option><option v-for="item in THREE_PIECE_OPTIONS" :key="item" :value="item">{{ item }}</option></select></label
           ><label>三件套说明<input v-model.trim="form.threePieceNote" /></label
-          ><label>申请单编码<input v-model.trim="form.applicationCode" /></label
+          ><label>员工入住申请单编码<input v-model.trim="form.applicationCode" /></label
           ><label>对接人<input v-model.trim="form.liaison" /></label
           ><label
             >入住时间<input
