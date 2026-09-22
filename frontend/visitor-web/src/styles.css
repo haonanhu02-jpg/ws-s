@@ -734,7 +734,9 @@ tbody tr:hover { background: var(--d86-brand-soft); }
   flex-direction: column;
   align-items: flex-start;
   gap: 7px;
-  min-height: 76px;
+  box-sizing: border-box;
+  flex: 0 0 76px;
+  height: 76px;
   padding: 10px 12px;
 }
 .dormitory-layout .fp-room-card-head > span {
@@ -768,6 +770,9 @@ tbody tr:hover { background: var(--d86-brand-soft); }
   justify-content: center;
   text-align: left;
   gap: 1px;
+  box-sizing: border-box;
+  flex: 0 0 54px;
+  height: 54px;
   min-height: 54px;
   line-height: 1.25;
 }
@@ -921,7 +926,7 @@ tbody tr:hover { background: var(--d86-brand-soft); }
   letter-spacing: .18em;
 }
 .dormitory-layout .fp-home-room .fp-beds { flex: 1; }
-.dormitory-layout .fp-home-room .fp-beds button { flex: 1; min-height: 38px; }
+.dormitory-layout .fp-home-room .fp-beds button { flex: 1 0 54px; min-height: 54px; }
 .dormitory-layout .fp-aodiluo-floor {
   display: grid;
   grid-template-columns: 40px minmax(980px, 1fr);
@@ -1082,4 +1087,3 @@ tbody tr:hover { background: var(--d86-brand-soft); }
   .dormitory-layout .rp-save-bar { justify-content: stretch; }
   .dormitory-layout .rp-save { width: 100%; justify-content: center; }
 }
-

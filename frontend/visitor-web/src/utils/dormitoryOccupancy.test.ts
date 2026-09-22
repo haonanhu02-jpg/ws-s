@@ -1,8 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { chooseBedStay, classifyRoomBeds, effectiveOccupancyStatus } from "./dormitoryOccupancy";
+import { chooseBedStay, classifyRoomBeds, effectiveOccupancyStatus, hasVisibleOccupantName } from "./dormitoryOccupancy";
 
 describe("dormitory occupancy presentation", () => {
   const businessDate = "2026-09-15";
+
+  it("does not treat blank or placeholder names as visible occupants", () => {
+    expect(hasVisibleOccupantName("")).toBe(false);
+    expect(hasVisibleOccupantName(" 未填写 ")).toBe(false);
+    expect(hasVisibleOccupantName("陈郭静")).toBe(true);
+  });
 
   it("shows a booked stay whose move-in date has arrived as checked in", () => {
     expect(effectiveOccupancyStatus({ status: "BOOKED", plannedMoveIn: "2026-09-13" }, businessDate)).toBe("CHECKED_IN");

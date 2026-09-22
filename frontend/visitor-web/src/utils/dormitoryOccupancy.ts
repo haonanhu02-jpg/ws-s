@@ -6,6 +6,11 @@ export interface DatedStay {
   plannedMoveOut?: string;
 }
 
+export function hasVisibleOccupantName(name: string | null | undefined): boolean {
+  const normalized = name?.trim();
+  return Boolean(normalized && normalized !== "未填写");
+}
+
 export function effectiveOccupancyStatus(stay: DatedStay, businessDate: string): OccupancyStatus | null {
   if (stay.status === "CHECKED_IN") return "CHECKED_IN";
   if (stay.status !== "BOOKED") return null;
