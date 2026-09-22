@@ -129,6 +129,9 @@ const checkoutModal = ref(false),
 const statistics = ref<DormitoryStatistics | null>(null);
 const attachmentModal=ref(false),attachmentStay=ref<Stay|null>(null),attachments=ref<StayAttachment[]>([]),attachmentType=ref('APPLICATION'),attachmentFile=ref<File|null>(null)
 const feeRule=reactive<FeeRule>({waterPrice:0,electricPrice:0,freeWater:0,freeElectric:0,enabled:false,operatorName:'',updatedAt:''}),feeBills=ref<FeeBill[]>([])
+const costCutStart = ref(`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}-01`);
+const costCutEnd = ref(new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai" }).format(new Date()));
+const costCutFilter = ref<"all" | "yes" | "no">("all");
 const shownBuildings = computed(() =>
   selectedBuilding.value
     ? buildings.value.filter((n) => n.building.id === selectedBuilding.value)
@@ -177,6 +180,34 @@ const overview = computed(() => {
     booked: shownTotals.value.booked,
   };
 });
+function datePlusOne(value: string): string {
+  const date = new Date(`${value}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + 1);
+  return date.toISOString().slice(0, 10);
+}
+function nightsBetween(start: string, endExclusive: string): number {
+  const from = Date.parse(`${start}T00:00:00Z`);
+  const to = Date.parse(`${endExclusive}T00:00:00Z`);
+  return Math.max(0, Math.round((to - from) / 86400000));
+}
+const costCutRows = computed(() => {
+  const start = costCutStart.value;
+  const cutoff = costCutEnd.value;
+  if (!start || !cutoff || start > cutoff) return [];
+  const endExclusive = datePlusOne(cutoff);
+  return shownStays.value
+    .filter((stay) => stay.status !== "CANCELLED")
+    .filter((stay) => costCutFilter.value === "all" || (costCutFilter.value === "yes" ? stay.costCut : !stay.costCut))
+    .map((stay) => {
+      const stayEndExclusive = stay.plannedMoveOut && stay.plannedMoveOut < endExclusive
+        ? stay.plannedMoveOut
+        : endExclusive;
+      const from = stay.plannedMoveIn > start ? stay.plannedMoveIn : start;
+      return { stay, from, to: stayEndExclusive, nights: nightsBetween(from, stayEndExclusive) };
+    })
+    .filter((row) => row.nights > 0);
+});
+const costCutNights = computed(() => costCutRows.value.reduce((sum, row) => sum + row.nights, 0));
 const capacityRows = computed(() => {
   const labels = ["单间", "标间"];
   return labels.map((label) => {
@@ -1412,7 +1443,11 @@ onMounted(load);
               </div>
               <p class="rate-line">入住率 <b>{{ overview.rate }}</b></p>
             </article>
-          </div></template
+          </div>
+          <section class="cost-cut-analysis">
+            <div class="section-title"><div><h3>降本数据</h3><small>入住日计 1 晚，退房日不计；截止日未退房计入截止日当晚。</small></div><div class="row-actions"><label>开始日期<input v-model="costCutStart" type="date" /></label><label>统计截止日<input v-model="costCutEnd" type="date" /></label><label>是否纳入降本<select v-model="costCutFilter"><option value="all">全部</option><option value="yes">是</option><option value="no">否</option></select></label></div></div>
+            <div class="table-wrap"><table><thead><tr><th>姓名</th><th>中心</th><th>部门</th><th>床位</th><th>是否纳入降本</th><th>入住区间</th><th>入住天数</th></tr></thead><tbody><tr v-for="row in costCutRows" :key="row.stay.id"><td>{{ row.stay.person.name }}</td><td>{{ row.stay.person.centerName || "-" }}</td><td>{{ row.stay.person.department }}</td><td>{{ row.stay.bed.bedCode }}</td><td>{{ row.stay.costCut ? "是" : "否" }}</td><td>{{ row.from }} 至 {{ row.to === datePlusOne(costCutEnd) ? costCutEnd : row.to }}</td><td><b>{{ row.nights }}</b></td></tr><tr v-if="!costCutRows.length"><td colspan="7" class="empty-cell">当前条件暂无入住记录</td></tr></tbody><tfoot><tr class="summary-total"><td colspan="6">合计入住天数</td><td>{{ costCutNights }}</td></tr></tfoot></table></div>
+          </section></template
         >
         <template v-else-if="!loading && active === 'floorplan'"
           ><div class="fp-head">
