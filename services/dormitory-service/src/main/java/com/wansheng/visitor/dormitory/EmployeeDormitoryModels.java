@@ -22,6 +22,9 @@ final class EmployeeDormitoryModels {
  record StayAttachment(Long id,Long stayId,String attachmentType,String originalName,String contentType,long fileSize,String operatorName,Instant createdAt) {}
  record FeeRule(BigDecimal waterPrice,BigDecimal electricPrice,BigDecimal freeWater,BigDecimal freeElectric,boolean enabled,String operatorName,Instant updatedAt) {}
  record FeeBill(Long id,Long roomId,String buildingName,String roomNo,String billingMonth,String occupantNames,BigDecimal waterUsage,BigDecimal electricUsage,BigDecimal waterPrice,BigDecimal electricPrice,BigDecimal freeWater,BigDecimal freeElectric,BigDecimal waterAmount,BigDecimal electricAmount,BigDecimal adjustment,BigDecimal totalAmount,String status,String remark,String operatorName,Instant updatedAt) {}
+ record FeeSettlementBatch(Long id,String billingMonth,String status,Long sourceBatchId,String remark,String operatorName,Instant createdAt) {}
+ record FeeSettlementEntry(Long id,Long batchId,Long stayId,Long personId,String personName,String department,Long roomId,String buildingName,String roomNo,String billingMonth,int occupiedDays,int chargeableDays,int occupantCount,BigDecimal waterUsage,BigDecimal electricUsage,BigDecimal freeElectricUsage,BigDecimal freeElectricAmount,BigDecimal waterAmount,BigDecimal electricAmount,BigDecimal totalAmount,String batchStatus,Long correctionOf,Instant createdAt) {}
+ record FeeSettlementResult(FeeSettlementBatch batch,List<FeeSettlementEntry> entries) {}
  record BuildingNode(Building building,List<Room> rooms) {}
  record Person(Long id,String name,String centerName,String department,String gender,String category,String positionName,String rankName) {}
  record Stay(Long id,Person person,Bed bed,StayStatus status,String applicationCode,String liaison,String bedType,String threePiece,String threePieceNote,boolean costCut,Boolean promiseSigned,boolean cleaningRequired,BigDecimal moveInWater,BigDecimal moveInElectric,BigDecimal moveOutWater,BigDecimal moveOutElectric,LocalDate plannedMoveIn,LocalDate plannedMoveOut,Instant checkedInAt,Instant checkedOutAt,String specialNote,String remark,long version) {}
@@ -42,4 +45,5 @@ final class EmployeeDormitoryModels {
  record MeterReadingCommand(@NotNull Long roomId,@NotBlank @Pattern(regexp="\\d{4}-(0[1-9]|1[0-2])") String readingMonth,@PositiveOrZero BigDecimal waterEnd,@PositiveOrZero BigDecimal electricEnd) {}
  record FeeRuleCommand(@NotNull @PositiveOrZero BigDecimal waterPrice,@NotNull @PositiveOrZero BigDecimal electricPrice,@NotNull @PositiveOrZero BigDecimal freeWater,@NotNull @PositiveOrZero BigDecimal freeElectric,@NotNull Boolean enabled) {}
  record FeeBillCommand(@NotNull BigDecimal adjustment,String remark,@NotBlank @Pattern(regexp="DRAFT|CONFIRMED") String status) {}
+ record FeeReversalCommand(@NotBlank String reason) {}
 }

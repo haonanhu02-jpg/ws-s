@@ -56,4 +56,7 @@ class EmployeeDormitoryController {
  @GetMapping("/fees/bills") List<FeeBill> bills(@RequestParam String month){return extension.bills(month);}
  @PostMapping("/fees/generate") List<FeeBill> generateBills(@RequestParam String month,Principal p){return extension.generate(month,p.getName());}
  @PutMapping("/fees/bills/{id}") FeeBill updateBill(@PathVariable long id,@Valid @RequestBody FeeBillCommand c,Principal p){return extension.updateBill(id,c,p.getName());}
+ @GetMapping("/fees/settlements") List<FeeSettlementEntry> settlements(@RequestParam(required=false)String month,@RequestParam(required=false)String person,@RequestParam(required=false)Long buildingId){return extension.settlements(month,person,buildingId);}
+ @PostMapping("/fees/settlements/generate") FeeSettlementResult generateSettlements(@RequestParam String month,Principal p){return extension.generateSettlements(month,p.getName());}
+ @PostMapping("/fees/settlements/{batchId}/reverse") FeeSettlementResult reverseSettlement(@PathVariable long batchId,@Valid @RequestBody FeeReversalCommand command,Principal p){return extension.reverseSettlement(batchId,command,p.getName());}
 }

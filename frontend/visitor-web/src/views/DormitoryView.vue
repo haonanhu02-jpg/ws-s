@@ -9,8 +9,7 @@ import {
   type Bed,
   type BuildingNode,
   type DormitoryStatistics,
-  type FeeBill,
-  type FeeRule,
+  type FeeSettlementEntry,
   type MeterReading,
   type Person,
   type ResourceAudit,
@@ -128,7 +127,7 @@ const checkoutModal = ref(false),
   });
 const statistics = ref<DormitoryStatistics | null>(null);
 const attachmentModal=ref(false),attachmentStay=ref<Stay|null>(null),attachments=ref<StayAttachment[]>([]),attachmentType=ref('APPLICATION'),attachmentFile=ref<File|null>(null)
-const feeRule=reactive<FeeRule>({waterPrice:0,electricPrice:0,freeWater:0,freeElectric:0,enabled:false,operatorName:'',updatedAt:''}),feeBills=ref<FeeBill[]>([])
+const settlementEntries=ref<FeeSettlementEntry[]>([]),settlementPerson=ref(''),settlementAllMonths=ref(false)
 const costCutStart = ref(`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}-01`);
 const costCutEnd = ref(new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai" }).format(new Date()));
 const costCutFilter = ref<"all" | "yes" | "no">("all");
@@ -488,7 +487,7 @@ async function loadMeters() {
       };
     }
 }
-async function loadFees(){const[rule,bills]=await Promise.all([dormitoryExtensionApi.feeRule(),dormitoryExtensionApi.feeBills(meterMonth.value)]);Object.assign(feeRule,rule);feeBills.value=bills}
+async function loadFees(){settlementEntries.value=await dormitoryExtensionApi.settlements(settlementAllMonths.value?'':meterMonth.value,settlementPerson.value,selectedBuilding.value)}
 async function changeMeterMonth() {
   try {
     await Promise.all([loadMeters(),loadFees()]);
@@ -496,9 +495,8 @@ async function changeMeterMonth() {
     error.value = e instanceof Error ? e.message : "抄表数据加载失败";
   }
 }
-async function saveFeeRule(){await resourceAction(()=>dormitoryExtensionApi.saveFeeRule({waterPrice:Number(feeRule.waterPrice),electricPrice:Number(feeRule.electricPrice),freeWater:Number(feeRule.freeWater),freeElectric:Number(feeRule.freeElectric),enabled:feeRule.enabled}),'费用规则已保存')}
-async function generateFees(){try{feeBills.value=await dormitoryExtensionApi.generateFeeBills(meterMonth.value);message.value=`${meterMonth.value} 账单已生成`}catch(e){error.value=e instanceof Error?e.message:'账单生成失败'}}
-async function updateFee(bill:FeeBill,confirmBill=false){const adjustment=confirmBill?bill.adjustment:Number(prompt('请输入调整金额（可为负数）',String(bill.adjustment))??bill.adjustment);try{await dormitoryExtensionApi.updateFeeBill(bill.id,{adjustment,remark:bill.remark||'',status:confirmBill?'CONFIRMED':'DRAFT'});message.value=confirmBill?'账单已确认':'账单已调整';await loadFees()}catch(e){error.value=e instanceof Error?e.message:'账单更新失败'}}
+async function generateFees(){try{await dormitoryExtensionApi.generateSettlements(meterMonth.value);message.value=`${meterMonth.value} 月底水电结算批次已生成`;await loadFees()}catch(e){error.value=e instanceof Error?e.message:'结算生成失败'}}
+async function reverseFee(batchId:number){const reason=prompt('请输入冲正原因');if(!reason?.trim())return;try{await dormitoryExtensionApi.reverseSettlement(batchId,reason.trim());message.value='冲正记录已生成，请重新生成正确结算批次';await loadFees()}catch(e){error.value=e instanceof Error?e.message:'冲正失败'}}
 async function openAttachments(stay:Stay){attachmentStay.value=stay;attachmentModal.value=true;attachmentFile.value=null;attachments.value=await dormitoryExtensionApi.attachments(stay.id)}
 async function uploadAttachment(){if(!attachmentStay.value||!attachmentFile.value){error.value='请选择附件';return}try{await dormitoryExtensionApi.uploadAttachment(attachmentStay.value.id,attachmentType.value,attachmentFile.value);attachments.value=await dormitoryExtensionApi.attachments(attachmentStay.value.id);attachmentFile.value=null;message.value='附件已上传'}catch(e){error.value=e instanceof Error?e.message:'附件上传失败'}}
 async function deleteAttachment(a:StayAttachment){if(!confirm(`确认删除 ${a.originalName}？`))return;await dormitoryExtensionApi.deleteAttachment(a.id);if(attachmentStay.value)attachments.value=await dormitoryExtensionApi.attachments(attachmentStay.value.id)}
@@ -1166,10 +1164,10 @@ function exportFullStays() {
 }
 function exportFees() {
   return exportWorkbook(
-    `房间费用明细_${meterMonth.value}`,
-    "房间费用明细",
-    ["月份", "楼栋", "房号", "住宿人员", "用水量", "水价", "免费水量", "水费", "用电量", "电价", "免费电量", "电费", "调整金额", "合计", "状态", "备注", "操作人"],
-    feeBills.value.map((b) => [b.billingMonth, b.buildingName, b.roomNo, b.occupantNames || "空房", b.waterUsage, b.waterPrice, b.freeWater, b.waterAmount, b.electricUsage, b.electricPrice, b.freeElectric, b.electricAmount, b.adjustment, b.totalAmount, b.status === "CONFIRMED" ? "已确认" : "草稿", b.remark || "", b.operatorName]),
+    `员工水电分摊明细_${settlementAllMonths.value?'全部月份':meterMonth.value}`,
+    "员工水电分摊明细",
+    ["批次", "月份", "姓名", "部门", "楼栋", "房号", "居住天数", "计费天数", "同住人数", "分摊水量", "分摊电量", "免费电抵扣度数", "免费电抵扣金额", "应付水费", "应付电费", "总费用", "记录类型", "生成时间"],
+    settlementEntries.value.map((e) => [e.batchId,e.billingMonth,e.personName,e.department,e.buildingName,e.roomNo,e.occupiedDays,e.chargeableDays,e.occupantCount,e.waterUsage,e.electricUsage,e.freeElectricUsage,e.freeElectricAmount,e.waterAmount,e.electricAmount,e.totalAmount,e.batchStatus==='REVERSAL'?'冲正':'正常结算',localTime(e.createdAt)]),
   );
 }
 async function downloadImportTemplate(kind: "people" | "resources" | "stays") {
@@ -1854,9 +1852,9 @@ onMounted(load);
             </div>
           </div>
           <section class="fee-section">
-            <div class="section-title"><div><h3>费用结算</h3><small>按房间月度用量生成账单；已确认账单不可修改</small></div><div class="row-actions"><button class="secondary-button" @click="exportFees">导出费用明细</button><button class="secondary-button" @click="saveFeeRule">保存规则</button><button @click="generateFees">生成本月账单</button></div></div>
-            <div class="fee-rule-grid"><label>水价（元/吨）<input v-model.number="feeRule.waterPrice" type="number" min="0" step="0.0001"/></label><label>电价（元/度）<input v-model.number="feeRule.electricPrice" type="number" min="0" step="0.0001"/></label><label>每房免费水量<input v-model.number="feeRule.freeWater" type="number" min="0" step="0.01"/></label><label>每房免费电量<input v-model.number="feeRule.freeElectric" type="number" min="0" step="0.01"/></label><label class="choice"><input v-model="feeRule.enabled" type="checkbox"/> 启用结算规则</label></div>
-            <div class="table-wrap"><table><thead><tr><th>楼栋/房间</th><th>住宿人员</th><th>水量/水费</th><th>电量/电费</th><th>调整</th><th>合计</th><th>状态</th><th>操作</th></tr></thead><tbody><tr v-for="b in feeBills" :key="b.id"><td>{{b.buildingName}} / {{b.roomNo}}</td><td>{{b.occupantNames||'空房'}}</td><td>{{b.waterUsage}} / ¥{{b.waterAmount}}</td><td>{{b.electricUsage}} / ¥{{b.electricAmount}}</td><td>¥{{b.adjustment}}</td><td><b>¥{{b.totalAmount}}</b></td><td>{{b.status==='CONFIRMED'?'已确认':'草稿'}}</td><td class="stay-actions"><button v-if="b.status==='DRAFT'" class="secondary" @click="updateFee(b)">调整</button><button v-if="b.status==='DRAFT'" @click="updateFee(b,true)">确认</button></td></tr><tr v-if="!feeBills.length"><td colspan="8" class="empty-cell">尚未生成本月账单；需要本月和上月抄表数据。</td></tr></tbody></table></div>
+            <div class="section-title"><div><h3>月底员工水电结算</h3><small>水费15元/吨；电费0.7元/度；每房每月免费电量5度。结算记录锁定，修正须冲正后重新生成。</small></div><div class="row-actions"><button class="secondary-button" @click="exportFees">导出Excel</button><button @click="generateFees">生成本月结算</button></div></div>
+            <div class="fee-rule-grid"><label>查询人员<input v-model="settlementPerson" placeholder="姓名或部门" @keyup.enter="loadFees"/></label><label class="choice"><input v-model="settlementAllMonths" type="checkbox" @change="loadFees"/> 查询全部月份</label><button class="secondary-button" @click="loadFees">查询</button></div>
+            <div class="table-wrap"><table><thead><tr><th>月份/批次</th><th>人员</th><th>楼栋/房间</th><th>居住/计费天数</th><th>水量/水费</th><th>电量/免费抵扣</th><th>应付电费</th><th>合计</th><th>类型</th><th>操作</th></tr></thead><tbody><tr v-for="e in settlementEntries" :key="e.id"><td>{{e.billingMonth}} / {{e.batchId}}</td><td>{{e.personName}}<small>{{e.department}}</small></td><td>{{e.buildingName}} / {{e.roomNo}}</td><td>{{e.occupiedDays}} / {{e.chargeableDays}}</td><td>{{e.waterUsage}} / ¥{{e.waterAmount}}</td><td>{{e.electricUsage}} / {{e.freeElectricUsage}}度（¥{{e.freeElectricAmount}}）</td><td>¥{{e.electricAmount}}</td><td><b>¥{{e.totalAmount}}</b></td><td>{{e.batchStatus==='REVERSAL'?'冲正':'正常结算'}}</td><td><button v-if="e.batchStatus==='GENERATED'" class="secondary" @click="reverseFee(e.batchId)">冲正本批次</button></td></tr><tr v-if="!settlementEntries.length"><td colspan="10" class="empty-cell">暂无结算记录。生成前需保存本月及上月水电表读数。</td></tr></tbody></table></div>
           </section></template
         >
         <template v-else-if="!loading && active === 'archive'"
