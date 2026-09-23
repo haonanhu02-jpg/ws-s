@@ -1070,7 +1070,11 @@ tbody tr:hover { background: var(--d86-brand-soft); }
    ============================================================ */
 .dormitory-layout .rp-field > span { white-space: nowrap; }
 .dormitory-layout .ledger-heading-right { display: flex; align-items: center; gap: 14px; flex-shrink: 0; }
-.dormitory-layout .ledger-heading-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.dormitory-layout .ledger-heading > div:first-child { flex: 0 0 150px; min-width: 150px; }
+.dormitory-layout .ledger-heading h2 { white-space: nowrap; }
+.dormitory-layout .ledger-heading-right { flex: 1 1 auto; min-width: 0; }
+.dormitory-layout .ledger-heading-actions { display: grid; flex: 1 1 auto; grid-template-columns: repeat(3,minmax(170px,1fr)); gap: 10px; }
+.dormitory-layout .ledger-heading-actions button { width: 100%; min-width: 0; white-space: normal; line-height: 1.35; }
 .dormitory-layout .rp-save-bar { margin: -6px 0 16px; display: flex; justify-content: flex-end; }
 .dormitory-layout .rp-save {
   display: inline-flex; align-items: center; gap: 8px;
@@ -1086,4 +1090,9 @@ tbody tr:hover { background: var(--d86-brand-soft); }
   .dormitory-layout .ledger-heading-right { width: 100%; flex-direction: column-reverse; align-items: flex-start; }
   .dormitory-layout .rp-save-bar { justify-content: stretch; }
   .dormitory-layout .rp-save { width: 100%; justify-content: center; }
+}
+@media (max-width: 1100px) {
+  .dormitory-layout .ledger-heading { align-items: flex-start; }
+  .dormitory-layout .ledger-heading-right { width: 100%; }
+  .dormitory-layout .ledger-heading-actions { grid-template-columns: repeat(2,minmax(160px,1fr)); }
 }

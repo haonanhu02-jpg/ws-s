@@ -50,13 +50,15 @@ class EmployeeDormitoryService {
     LocalDate plannedMoveIn=c.plannedMoveIn()==null?LocalDate.now(ZoneId.of("Asia/Shanghai")):c.plannedMoveIn();
     Optional<Stay> existing=repo.activeStayForImport(bed.id(),name,department,plannedMoveIn,c.plannedMoveOut());
     if(existing.isPresent()){
-     updateStay(existing.get().id(),new UpdateStayCommand(name,c.centerName(),department,gender,category,c.positionName(),c.rankName(),c.applicationCode(),c.liaison(),bedType,c.threePiece(),c.threePieceNote(),Boolean.TRUE.equals(c.costCut()),c.promiseSigned(),c.cleaningRequired(),c.moveInWater(),c.moveInElectric(),c.moveOutWater(),c.moveOutElectric(),plannedMoveIn,c.plannedMoveOut(),c.specialNote(),c.remark()),op);
+     Stay updated=updateStay(existing.get().id(),new UpdateStayCommand(name,c.centerName(),department,gender,category,c.positionName(),c.rankName(),c.applicationCode(),c.liaison(),bedType,c.threePiece(),c.threePieceNote(),Boolean.TRUE.equals(c.costCut()),c.promiseSigned(),c.cleaningRequired(),c.moveInWater(),c.moveInElectric(),c.moveOutWater(),c.moveOutElectric(),plannedMoveIn,c.plannedMoveOut(),c.specialNote(),c.remark()),op);
+     if(updated.status()==StayStatus.BOOKED&&shouldCheckIn(c.importedStatus(),plannedMoveIn))checkIn(updated.id(),op);
      staysUpdated++;
      continue;
     }
     Person person=repo.person(name,department).orElse(null);
     if(person==null){long personId=repo.addPerson(new PersonCommand(name,c.centerName(),department,gender,category,c.positionName(),c.rankName()));person=repo.person(personId).orElseThrow();peopleCreated++;}
-    book(new BookCommand(person.id(),bed.id(),c.applicationCode(),c.liaison(),bedType,c.threePiece(),c.threePieceNote(),Boolean.TRUE.equals(c.costCut()),c.promiseSigned(),c.cleaningRequired(),c.moveInWater(),c.moveInElectric(),c.moveOutWater(),c.moveOutElectric(),plannedMoveIn,c.plannedMoveOut(),c.specialNote(),c.remark()),op);
+    Stay created=book(new BookCommand(person.id(),bed.id(),c.applicationCode(),c.liaison(),bedType,c.threePiece(),c.threePieceNote(),Boolean.TRUE.equals(c.costCut()),c.promiseSigned(),c.cleaningRequired(),c.moveInWater(),c.moveInElectric(),c.moveOutWater(),c.moveOutElectric(),plannedMoveIn,c.plannedMoveOut(),c.specialNote(),c.remark()),op);
+    if(shouldCheckIn(c.importedStatus(),plannedMoveIn))checkIn(created.id(),op);
     staysCreated++;
    }catch(ResponseStatusException e){skipped.add("第"+(i+2)+"行："+e.getReason());}
   }
@@ -82,6 +84,7 @@ class EmployeeDormitoryService {
  private static void validateDates(java.time.LocalDate in,java.time.LocalDate out){if(out!=null&&out.isBefore(in))throw bad("计划退宿日期不得早于入住日期");}
  private static boolean blank(String value){return value==null||value.isBlank();}
  private static String normalizeCategory(String value){if(blank(value))return "未分类";String normalized=value.trim().replace('（','(').replace('）',')');return switch(normalized){case "已审批长住人","已审批长住人员","已审批长住员工"->"己审批长住员工";default->normalized;};}
+ private static boolean shouldCheckIn(String importedStatus,LocalDate plannedMoveIn){String status=blank(importedStatus)?"":importedStatus.trim().toUpperCase(Locale.ROOT);return status.equals("已入住")||status.equals("CHECKED_IN")||!plannedMoveIn.isAfter(LocalDate.now(ZoneId.of("Asia/Shanghai")));}
  private static PersonCommand personDefaults(PersonCommand c){return new PersonCommand(blank(c.name())?"未填写":c.name().trim(),c.centerName(),blank(c.department())?"未填写":c.department().trim(),blank(c.gender())?"未填写":c.gender().trim(),blank(c.category())?"未分类":c.category().trim(),c.positionName(),c.rankName());}
  private static BookCommand bookDefaults(BookCommand c){return new BookCommand(c.personId(),c.bedId(),c.applicationCode(),c.liaison(),blank(c.bedType())?"未填写":c.bedType().trim(),c.threePiece(),c.threePieceNote(),Boolean.TRUE.equals(c.costCut()),c.promiseSigned(),Boolean.TRUE.equals(c.cleaningRequired()),c.moveInWater(),c.moveInElectric(),c.moveOutWater(),c.moveOutElectric(),c.plannedMoveIn()==null?LocalDate.now(ZoneId.of("Asia/Shanghai")):c.plannedMoveIn(),c.plannedMoveOut(),c.specialNote(),c.remark());}
  private static UpdateStayCommand stayDefaults(UpdateStayCommand c){return new UpdateStayCommand(blank(c.name())?"未填写":c.name().trim(),c.centerName(),blank(c.department())?"未填写":c.department().trim(),blank(c.gender())?"未填写":c.gender().trim(),blank(c.category())?"未分类":c.category().trim(),c.positionName(),c.rankName(),c.applicationCode(),c.liaison(),blank(c.bedType())?"未填写":c.bedType().trim(),c.threePiece(),c.threePieceNote(),Boolean.TRUE.equals(c.costCut()),c.promiseSigned(),Boolean.TRUE.equals(c.cleaningRequired()),c.moveInWater(),c.moveInElectric(),c.moveOutWater(),c.moveOutElectric(),c.plannedMoveIn()==null?LocalDate.now(ZoneId.of("Asia/Shanghai")):c.plannedMoveIn(),c.plannedMoveOut(),c.specialNote(),c.remark());}

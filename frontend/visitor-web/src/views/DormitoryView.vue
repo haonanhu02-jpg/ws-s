@@ -348,21 +348,22 @@ const totals = computed(() => {
   };
 });
 const alerts = computed(() => ({
-  clean: buildings.value
+  clean: shownBuildings.value
     .flatMap((b) => b.rooms)
-    .filter((r) => r.cleaningRequired),
-  bookedRooms: buildings.value
+    .filter((r) => r.enabled && (r.cleaningRequired || r.beds.some((bed) => bed.enabled && bed.cleaningRequired))),
+  bookedRooms: shownBuildings.value
     .flatMap((b) => b.rooms)
+    .filter((r) => r.enabled)
     .filter((room) => room.beds.some((bed) => {
       const stay = displayStayForBed(bed.id);
       return stay && effectiveStayStatus(stay) === "BOOKED";
     })),
-  overdue: activeStays.value.filter(
+  overdue: shownStays.value.filter((s) => s.status === "BOOKED" || s.status === "CHECKED_IN").filter(
     (s) =>
       s.plannedMoveOut &&
       s.plannedMoveOut <= new Date().toISOString().slice(0, 10),
   ),
-  missingEmployeeApplication: activeStays.value.filter((stay) =>
+  missingEmployeeApplication: shownStays.value.filter((s) => s.status === "BOOKED" || s.status === "CHECKED_IN").filter((stay) =>
     ["已审批长住员工", "已审批长住人员", "己审批长住员工"].includes(stay.person.category || "")
     && !stay.applicationCode?.trim(),
   ),
@@ -1301,12 +1302,13 @@ async function chooseImport(kind: "people" | "resources" | "stays") {
         const allowedBuilding = selectedBuilding.value ? shownBuildings.value[0]?.building.name : null;
         const outOfScopeRows = normalizedRows.map((row, index) => row[8] && row[8] !== allowedBuilding && allowedBuilding ? index + 2 : 0).filter(Boolean);
         if (allowedBuilding && outOfScopeRows.length) throw new Error(`当前范围为${allowedBuilding}，第${outOfScopeRows.join("、")}行填写了其他宿舍`);
-        const summary = await dormitoryApi.importStays(normalizedRows.map((r) => ({
+        const summary = await dormitoryApi.importStays(normalizedRows.map((r, rowIndex) => ({
           name:r[1]||"未填写",centerName:r[2],department:r[3]||"未填写",gender:r[4]||null,category:normalizePersonCategory(r[5]),positionName:r[6],rankName:r[7],
           buildingName:r[8],roomNo:r[0],bedCode:r[9],applicationCode:r[10],liaison:r[11],bedType:r[12],
           threePiece:r[13]||null,threePieceNote:r[14]||null,costCut:excelBoolean(r[15]),promiseSigned:excelBoolean(r[16]),
           moveInWater:excelNumber(r[17]),moveInElectric:excelNumber(r[18]),moveOutWater:excelNumber(r[19]),moveOutElectric:excelNumber(r[20]),
           cleaningRequired:excelBoolean(r[21]),plannedMoveIn:r[22]||today(),plannedMoveOut:r[23]||null,specialNote:r[24]||null,remark:r[25]||null,
+          importedStatus: (() => { const i = importedHeaders.indexOf("当前状态"); return i < 0 ? null : clean[rowIndex]?.[i] || null; })(),
         })));
         message.value = `入住数据导入完成：新增住宿 ${summary.staysCreated}、更新住宿 ${summary.staysUpdated}、新增人员 ${summary.peopleCreated}`;
         if (summary.skipped.length) error.value = `以下${summary.skipped.length}条数据未导入：\n• ${summary.skipped.join("\n• ")}\n请根据提示修正后重新导入。`;
@@ -1629,7 +1631,7 @@ onMounted(load);
                   <td>{{ s.person.gender }}</td>
                   <td>{{ bedDisplayName(s.bed) }}</td>
                   <td>{{ s.threePiece || "-" }}</td>
-                  <td><span :class="['ledger-status', (s.status || '').toLowerCase()]">{{ statusLabel(s.status) }}</span></td>
+                  <td><span :class="['ledger-status', (effectiveStayStatus(s) || s.status).toLowerCase()]">{{ effectiveStayStatus(s) ? statusLabel(effectiveStayStatus(s)!) : statusLabel(s.status) }}</span></td>
                   <td>{{ s.plannedMoveIn }}</td>
                   <td>{{ s.plannedMoveOut || "-" }}</td>
                   <td class="stay-actions">
