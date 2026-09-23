@@ -964,12 +964,6 @@ async function exportWorkbook(
   });
   if (filename.includes("完整入住导入模板")) {
     const column = (name: string) => headers.indexOf(name) + 1;
-    const requiredHeaders = ["房号", "楼栋名称", "床位编码", "床位类型"];
-    requiredHeaders.forEach((name) => {
-      const cell = sheet.getCell(1, column(name));
-      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFD9D5" } };
-      cell.note = `${name}为必填项`;
-    });
     const lists: Record<string, string[]> = {
       性别: ["男", "女"],
       人员类别: [...PERSON_CATEGORIES],
@@ -992,7 +986,9 @@ async function exportWorkbook(
     const instructions = workbook.addWorksheet("填写说明");
     instructions.addRows([
       ["字段", "填写要求"],
-      ["红色表头", "必填项，不能为空"],
+      ["全部字段", "均为选填；允许删除不需要的列，列顺序也可以调整，系统按表头名称识别"],
+      ["床位编码", "留空时该行不创建住宿记录，也不会自动分配到其他床位"],
+      ["楼栋名称、房号", "允许留空；填写床位编码后，系统自动识别所属楼栋和房间"],
       ["部门", "允许留空；导入后按“未填写”保存"],
       ["性别", "允许留空；填写时请从“男/女”中选择"],
       ["是否纳入降本、已签承诺书、待打扫", "允许留空，留空按“否”处理"],
@@ -1223,7 +1219,6 @@ function excelCellText(value: unknown, columnIndex: number): string {
 }
 function validateStayImportRows(rows: string[][]): void {
   const issues: string[] = [];
-  const required = [[0, "房号"], [8, "楼栋名称"], [9, "床位编码"], [12, "床位类型"]] as const;
   const numberColumns = [[17, "入住时水费度数"], [18, "入住时电费度数"], [19, "退房时水费度数"], [20, "退房时电费度数"]] as const;
   const yesNoColumns = [[15, "是否纳入降本"], [16, "已签承诺书"], [21, "待打扫"]] as const;
   const isoDate = /^\d{4}-\d{2}-\d{2}$/;
@@ -1231,9 +1226,6 @@ function validateStayImportRows(rows: string[][]): void {
     issues.push(`第${excelRow}行｜${field}｜当前值：${value || "（空白）"}｜原因：${reason}｜填写要求：${requirement}`);
   rows.forEach((row, index) => {
     const excelRow = index + 2;
-    required.forEach(([column, label]) => {
-      if (!row[column]?.trim()) issue(excelRow, label, row[column], "必填项未填写", "不能为空");
-    });
     if (row[4] && !["男", "女"].includes(row[4])) issue(excelRow, "性别", row[4], "选项不符合要求", "填写“男”或“女”");
     if (row[13] && !["自带", "公司提供"].includes(row[13])) issue(excelRow, "三件套", row[13], "选项不符合要求", "填写“自带”或“公司提供”，也可以留空");
     yesNoColumns.forEach(([column, label]) => {
@@ -1303,15 +1295,15 @@ async function chooseImport(kind: "people" | "resources" | "stays") {
         message.value = `资源导入完成：楼栋 ${summary.buildingsCreated}、房间 ${summary.roomsCreated}、床位 ${summary.bedsCreated}，跳过 ${summary.skipped.length}`;
       } else {
         const importedHeaders = ((sheet.getRow(1).values as unknown[]) || []).slice(1).map((value) => String(value ?? "").trim());
-        const missingHeaders = FULL_STAY_HEADERS.filter((header) => !importedHeaders.includes(header));
-        if (missingHeaders.length) throw new Error(`导入模板缺少字段：${missingHeaders.join("、")}`);
-        const misplacedHeaders = FULL_STAY_HEADERS.map((header, index) => importedHeaders[index] === header ? "" : `第${index + 1}列应为“${header}”，当前为“${importedHeaders[index] || "空白"}”`).filter(Boolean);
-        if (misplacedHeaders.length) throw new Error(`导入模板字段顺序不正确：\n• ${misplacedHeaders.join("\n• ")}\n请使用“下载完整模板”生成的模板填写。`);
-        validateStayImportRows(clean);
+        const normalizedRows = clean.map((row) => FULL_STAY_HEADERS.map((header) => {
+          const sourceIndex = importedHeaders.indexOf(header);
+          return sourceIndex < 0 ? "" : row[sourceIndex] || "";
+        }));
+        validateStayImportRows(normalizedRows);
         const allowedBuilding = selectedBuilding.value ? shownBuildings.value[0]?.building.name : null;
-        const outOfScopeRows = clean.map((row, index) => row[8] !== allowedBuilding && allowedBuilding ? index + 2 : 0).filter(Boolean);
+        const outOfScopeRows = normalizedRows.map((row, index) => row[8] && row[8] !== allowedBuilding && allowedBuilding ? index + 2 : 0).filter(Boolean);
         if (allowedBuilding && outOfScopeRows.length) throw new Error(`当前范围为${allowedBuilding}，第${outOfScopeRows.join("、")}行填写了其他宿舍`);
-        const summary = await dormitoryApi.importStays(clean.map((r) => ({
+        const summary = await dormitoryApi.importStays(normalizedRows.map((r) => ({
           name:r[1]||"未填写",centerName:r[2],department:r[3]||"未填写",gender:r[4]||null,category:r[5],positionName:r[6],rankName:r[7],
           buildingName:r[8],roomNo:r[0],bedCode:r[9],applicationCode:r[10],liaison:r[11],bedType:r[12],
           threePiece:r[13]||null,threePieceNote:r[14]||null,costCut:excelBoolean(r[15]),promiseSigned:excelBoolean(r[16]),
