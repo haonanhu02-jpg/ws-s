@@ -145,13 +145,14 @@ const shownStays = computed(() =>
     : stays.value.filter((s) => selectedBedIds.value.has(s.bed.id)),
 );
 const shownTotals = computed(() => {
-  const rooms = shownBuildings.value.flatMap((n) => n.rooms).filter((r) => r.livable);
+  const enabledBuildings = shownBuildings.value.filter((n) => n.building.enabled);
+  const rooms = enabledBuildings.flatMap((n) => n.rooms).filter((r) => r.enabled && r.livable);
   const beds = rooms.flatMap((r) => r.beds).filter((b) => b.enabled);
   const displayed = beds.map((bed) => displayStayForBed(bed.id)).filter((stay): stay is Stay => Boolean(stay));
   const booked = displayed.filter((stay) => effectiveStayStatus(stay) === "BOOKED").length;
   const occupied = displayed.filter((stay) => effectiveStayStatus(stay) === "CHECKED_IN").length;
   return {
-    buildings: shownBuildings.value.length,
+    buildings: enabledBuildings.length,
     rooms: rooms.length,
     beds: beds.length,
     booked,
@@ -166,7 +167,8 @@ const remoteBuilding = computed(() =>
   buildings.value.find((node) => /[岙吞底罗空间]/.test(node.building.name)) ?? buildings.value.at(-1),
 );
 const overview = computed(() => {
-  const checkedIn = shownBuildings.value.flatMap((node) => node.rooms).flatMap((room) => room.beds)
+  const checkedIn = shownBuildings.value.filter((node) => node.building.enabled)
+    .flatMap((node) => node.rooms.filter((room) => room.enabled && room.livable)).flatMap((room) => room.beds.filter((bed) => bed.enabled))
     .map((bed) => displayStayForBed(bed.id)).filter((stay): stay is Stay => Boolean(stay))
     .filter((stay) => effectiveStayStatus(stay) === "CHECKED_IN");
   const totalBeds = shownTotals.value.beds;
