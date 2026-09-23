@@ -31,7 +31,7 @@ class EmployeeDormitoryService {
  @Transactional ImportSummary importResources(List<ResourceImportCommand> commands,String op){if(commands==null||commands.isEmpty())throw bad("导入文件没有房间床位数据");int buildings=0,rooms=0,beds=0;List<String> skipped=new ArrayList<>();for(int i=0;i<commands.size();i++){ResourceImportCommand c=commands.get(i);Building building=repo.building(c.buildingName().trim(),c.regionName().trim()).orElse(null);if(building==null){building=addBuilding(new BuildingCommand(c.buildingName().trim(),c.regionName().trim(),true,0),op);buildings++;}Room room=repo.room(building.id(),c.roomNo().trim()).orElse(null);if(room==null){room=addRoom(new RoomCommand(building.id(),c.roomNo().trim(),c.floorNo(),c.facing(),c.roomType().trim(),true,false,null,null,null,null,0,null,true),op);rooms++;}if(repo.bed(c.bedCode().trim()).isPresent()){skipped.add("第"+(i+2)+"行：床位编码"+c.bedCode()+"已存在");continue;}addBed(new BedCommand(room.id(),c.bedLabel().trim(),c.bedCode().trim(),c.threePiece(),true),op);beds++;}return new ImportSummary(commands.size(),0,buildings,rooms,beds,skipped);}
  @Transactional StayImportSummary importStays(List<StayImportCommand> commands,String op){
   if(commands==null||commands.isEmpty())throw bad("导入文件没有入住数据");
-  int staysCreated=0,peopleCreated=0;
+  int staysCreated=0,staysUpdated=0,peopleCreated=0;
   List<String> skipped=new ArrayList<>();
   for(int i=0;i<commands.size();i++){
    StayImportCommand c=commands.get(i);
@@ -45,16 +45,22 @@ class EmployeeDormitoryService {
     String name=blank(c.name())?"未填写":c.name().trim();
     String department=blank(c.department())?"未填写":c.department().trim();
     String gender=blank(c.gender())?"未填写":c.gender().trim();
-    String category=blank(c.category())?"未分类":c.category().trim();
+    String category=normalizeCategory(c.category());
     String bedType=blank(c.bedType())?room.roomType():c.bedType().trim();
     LocalDate plannedMoveIn=c.plannedMoveIn()==null?LocalDate.now(ZoneId.of("Asia/Shanghai")):c.plannedMoveIn();
+    Optional<Stay> existing=repo.activeStayForImport(bed.id(),name,department,plannedMoveIn,c.plannedMoveOut());
+    if(existing.isPresent()){
+     updateStay(existing.get().id(),new UpdateStayCommand(name,c.centerName(),department,gender,category,c.positionName(),c.rankName(),c.applicationCode(),c.liaison(),bedType,c.threePiece(),c.threePieceNote(),Boolean.TRUE.equals(c.costCut()),c.promiseSigned(),c.cleaningRequired(),c.moveInWater(),c.moveInElectric(),c.moveOutWater(),c.moveOutElectric(),plannedMoveIn,c.plannedMoveOut(),c.specialNote(),c.remark()),op);
+     staysUpdated++;
+     continue;
+    }
     Person person=repo.person(name,department).orElse(null);
     if(person==null){long personId=repo.addPerson(new PersonCommand(name,c.centerName(),department,gender,category,c.positionName(),c.rankName()));person=repo.person(personId).orElseThrow();peopleCreated++;}
     book(new BookCommand(person.id(),bed.id(),c.applicationCode(),c.liaison(),bedType,c.threePiece(),c.threePieceNote(),Boolean.TRUE.equals(c.costCut()),c.promiseSigned(),c.cleaningRequired(),c.moveInWater(),c.moveInElectric(),c.moveOutWater(),c.moveOutElectric(),plannedMoveIn,c.plannedMoveOut(),c.specialNote(),c.remark()),op);
     staysCreated++;
    }catch(ResponseStatusException e){skipped.add("第"+(i+2)+"行："+e.getReason());}
   }
-  return new StayImportSummary(commands.size(),staysCreated,peopleCreated,skipped);
+  return new StayImportSummary(commands.size(),staysCreated,staysUpdated,peopleCreated,skipped);
  }
  DormitoryStatistics statistics(){ResourceTree tree=tree();List<Stay> all=repo.stays(null,null,null);List<Person> persons=repo.people(null);List<BuildingNode> enabledBuildings=tree.buildings().stream().filter(n->n.building().enabled()).toList();List<Room> enabledRooms=enabledBuildings.stream().flatMap(n->n.rooms().stream()).filter(r->r.enabled()&&r.livable()).toList();Set<Long> enabledBedIds=enabledRooms.stream().flatMap(r->r.beds().stream()).filter(Bed::enabled).map(Bed::id).collect(java.util.stream.Collectors.toSet());int rooms=enabledRooms.size(),beds=enabledBedIds.size();int booked=(int)all.stream().filter(s->enabledBedIds.contains(s.bed().id())&&s.status()==StayStatus.BOOKED).count(),checkedIn=(int)all.stream().filter(s->enabledBedIds.contains(s.bed().id())&&s.status()==StayStatus.CHECKED_IN).count(),checkedOut=count(all,StayStatus.CHECKED_OUT),cancelled=count(all,StayStatus.CANCELLED);List<StatisticsItem> byBuilding=enabledBuildings.stream().map(n->{Set<Long> ids=n.rooms().stream().filter(r->r.enabled()&&r.livable()).flatMap(r->r.beds().stream()).filter(Bed::enabled).map(Bed::id).collect(java.util.stream.Collectors.toSet());int active=(int)all.stream().filter(s->ids.contains(s.bed().id())&&(s.status()==StayStatus.BOOKED||s.status()==StayStatus.CHECKED_IN)).count();return new StatisticsItem(n.building().name(),ids.size(),active);}).toList();List<StatisticsItem> categories=persons.stream().collect(java.util.stream.Collectors.groupingBy(Person::category,java.util.stream.Collectors.counting())).entrySet().stream().sorted(Map.Entry.comparingByKey()).map(e->new StatisticsItem(e.getKey(),e.getValue().intValue(),(int)all.stream().filter(s->enabledBedIds.contains(s.bed().id())&&s.person().category().equals(e.getKey())&&(s.status()==StayStatus.BOOKED||s.status()==StayStatus.CHECKED_IN)).count())).toList();List<StatisticsItem> statuses=List.of(new StatisticsItem("已预定",booked,booked),new StatisticsItem("已入住",checkedIn,checkedIn),new StatisticsItem("已退宿",checkedOut,0),new StatisticsItem("已取消",cancelled,0));return new DormitoryStatistics(new StatisticsSummary(persons.size(),enabledBuildings.size(),rooms,beds,booked,checkedIn,checkedOut,cancelled,Math.max(0,beds-booked-checkedIn)),byBuilding,categories,statuses);}
  List<Stay> stays(String status,Long buildingId,String name){if(status!=null&&!status.isBlank())try{StayStatus.valueOf(status);}catch(IllegalArgumentException e){throw bad("未知住宿状态");}return repo.stays(status,buildingId,name);}
@@ -75,6 +81,7 @@ class EmployeeDormitoryService {
  private Bed enabledBed(long id){Bed b=repo.bed(id).orElseThrow(()->bad("床位不存在"));enabledRoom(b.roomId());if(!b.enabled())throw conflict("床位已停用");return b;}
  private static void validateDates(java.time.LocalDate in,java.time.LocalDate out){if(out!=null&&out.isBefore(in))throw bad("计划退宿日期不得早于入住日期");}
  private static boolean blank(String value){return value==null||value.isBlank();}
+ private static String normalizeCategory(String value){if(blank(value))return "未分类";String normalized=value.trim().replace('（','(').replace('）',')');return switch(normalized){case "已审批长住人","已审批长住人员","已审批长住员工"->"己审批长住员工";default->normalized;};}
  private static PersonCommand personDefaults(PersonCommand c){return new PersonCommand(blank(c.name())?"未填写":c.name().trim(),c.centerName(),blank(c.department())?"未填写":c.department().trim(),blank(c.gender())?"未填写":c.gender().trim(),blank(c.category())?"未分类":c.category().trim(),c.positionName(),c.rankName());}
  private static BookCommand bookDefaults(BookCommand c){return new BookCommand(c.personId(),c.bedId(),c.applicationCode(),c.liaison(),blank(c.bedType())?"未填写":c.bedType().trim(),c.threePiece(),c.threePieceNote(),Boolean.TRUE.equals(c.costCut()),c.promiseSigned(),Boolean.TRUE.equals(c.cleaningRequired()),c.moveInWater(),c.moveInElectric(),c.moveOutWater(),c.moveOutElectric(),c.plannedMoveIn()==null?LocalDate.now(ZoneId.of("Asia/Shanghai")):c.plannedMoveIn(),c.plannedMoveOut(),c.specialNote(),c.remark());}
  private static UpdateStayCommand stayDefaults(UpdateStayCommand c){return new UpdateStayCommand(blank(c.name())?"未填写":c.name().trim(),c.centerName(),blank(c.department())?"未填写":c.department().trim(),blank(c.gender())?"未填写":c.gender().trim(),blank(c.category())?"未分类":c.category().trim(),c.positionName(),c.rankName(),c.applicationCode(),c.liaison(),blank(c.bedType())?"未填写":c.bedType().trim(),c.threePiece(),c.threePieceNote(),Boolean.TRUE.equals(c.costCut()),c.promiseSigned(),Boolean.TRUE.equals(c.cleaningRequired()),c.moveInWater(),c.moveInElectric(),c.moveOutWater(),c.moveOutElectric(),c.plannedMoveIn()==null?LocalDate.now(ZoneId.of("Asia/Shanghai")):c.plannedMoveIn(),c.plannedMoveOut(),c.specialNote(),c.remark());}

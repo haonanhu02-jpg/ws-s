@@ -47,6 +47,12 @@ const PERSON_CATEGORIES = [
   "新员工(普通)",
   "己审批长住员工",
 ] as const;
+function normalizePersonCategory(value: string): string {
+  const normalized = value.trim().replaceAll("（", "(").replaceAll("）", ")");
+  return ["已审批长住人", "已审批长住人员", "已审批长住员工"].includes(normalized)
+    ? "己审批长住员工"
+    : normalized;
+}
 const THREE_PIECE_OPTIONS = ["自带", "公司提供"] as const;
 const router = useRouter();
 const currentUser = computed(() => JSON.parse(sessionStorage.getItem("visitor-user") || "{}"));
@@ -323,7 +329,7 @@ function bedDisplayName(bed: Bed): string {
 }
 const selectedBedName = computed(() => selectedBed.value ? bedDisplayName(selectedBed.value) : "");
 const selectedBedReservations = computed(() => selectedBed.value
-  ? activeStays.value.filter((stay) => stay.bed.id === selectedBed.value?.id).sort((a, b) => a.plannedMoveIn.localeCompare(b.plannedMoveIn))
+  ? activeStays.value.filter((stay) => stay.bed.id === selectedBed.value?.id).sort((a, b) => b.plannedMoveIn.localeCompare(a.plannedMoveIn) || b.id - a.id)
   : []);
 const totals = computed(() => {
   const rooms = buildings.value
@@ -558,6 +564,10 @@ function openBed(room: Room, bed: Bed) {
     specialNote: "", remark: "",
   });
   modal.value = true;
+  const latest = activeStays.value
+    .filter((stay) => stay.bed.id === bed.id)
+    .sort((a, b) => b.plannedMoveIn.localeCompare(a.plannedMoveIn) || b.id - a.id)[0];
+  if (latest) selectReservation(latest);
   message.value = stayByBed.value[bed.id] ? "该床位已有记录，可继续录入日期不冲突的后续预订" : "";
 }
 function selectReservation(stay: Stay) {
@@ -1292,13 +1302,13 @@ async function chooseImport(kind: "people" | "resources" | "stays") {
         const outOfScopeRows = normalizedRows.map((row, index) => row[8] && row[8] !== allowedBuilding && allowedBuilding ? index + 2 : 0).filter(Boolean);
         if (allowedBuilding && outOfScopeRows.length) throw new Error(`当前范围为${allowedBuilding}，第${outOfScopeRows.join("、")}行填写了其他宿舍`);
         const summary = await dormitoryApi.importStays(normalizedRows.map((r) => ({
-          name:r[1]||"未填写",centerName:r[2],department:r[3]||"未填写",gender:r[4]||null,category:r[5],positionName:r[6],rankName:r[7],
+          name:r[1]||"未填写",centerName:r[2],department:r[3]||"未填写",gender:r[4]||null,category:normalizePersonCategory(r[5]),positionName:r[6],rankName:r[7],
           buildingName:r[8],roomNo:r[0],bedCode:r[9],applicationCode:r[10],liaison:r[11],bedType:r[12],
           threePiece:r[13]||null,threePieceNote:r[14]||null,costCut:excelBoolean(r[15]),promiseSigned:excelBoolean(r[16]),
           moveInWater:excelNumber(r[17]),moveInElectric:excelNumber(r[18]),moveOutWater:excelNumber(r[19]),moveOutElectric:excelNumber(r[20]),
           cleaningRequired:excelBoolean(r[21]),plannedMoveIn:r[22]||today(),plannedMoveOut:r[23]||null,specialNote:r[24]||null,remark:r[25]||null,
         })));
-        message.value = `入住数据导入完成：新增住宿 ${summary.staysCreated}、新增人员 ${summary.peopleCreated}`;
+        message.value = `入住数据导入完成：新增住宿 ${summary.staysCreated}、更新住宿 ${summary.staysUpdated}、新增人员 ${summary.peopleCreated}`;
         if (summary.skipped.length) error.value = `以下${summary.skipped.length}条数据未导入：\n• ${summary.skipped.join("\n• ")}\n请根据提示修正后重新导入。`;
       }
       await load();

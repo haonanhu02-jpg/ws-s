@@ -28,7 +28,7 @@ final class EmployeeDormitoryModels {
  record BuildingNode(Building building,List<Room> rooms) {}
  record Person(Long id,String name,String centerName,String department,String gender,String category,String positionName,String rankName) {}
  record Stay(Long id,Person person,Bed bed,StayStatus status,String applicationCode,String liaison,String bedType,String threePiece,String threePieceNote,boolean costCut,Boolean promiseSigned,boolean cleaningRequired,BigDecimal moveInWater,BigDecimal moveInElectric,BigDecimal moveOutWater,BigDecimal moveOutElectric,LocalDate plannedMoveIn,LocalDate plannedMoveOut,Instant checkedInAt,Instant checkedOutAt,String specialNote,String remark,long version) {}
- record StayImportSummary(int received,int staysCreated,int peopleCreated,List<String> skipped) {}
+ record StayImportSummary(int received,int staysCreated,int staysUpdated,int peopleCreated,List<String> skipped) {}
 
  record BuildingCommand(@NotBlank String name,@NotBlank String regionName,Boolean enabled,Integer displayOrder) {}
  record RoomCommand(@NotNull Long buildingId,@NotBlank String roomNo,@NotNull Integer floorNo,String facing,@NotBlank String roomType,Boolean livable,Boolean cleaningRequired,Integer gridCol,Integer gridRow,Integer gridColSpan,Integer gridRowSpan,Integer displayOrder,String specialNote,Boolean enabled) {}
