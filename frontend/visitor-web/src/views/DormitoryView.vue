@@ -73,23 +73,23 @@ const form = reactive({
   name: "",
   centerName: "",
   department: "",
-  gender: "男" as "男" | "女",
+  gender: "" as "" | "男" | "女",
   category: "",
   positionName: "",
   rankName: "",
   applicationCode: "",
   liaison: "",
-  bedType: "过渡房",
+  bedType: "",
   threePiece: "",
   threePieceNote: "",
-  costCut: false,
-  promiseSigned: false,
-  cleaningRequired: false,
+  costCut: null as boolean | null,
+  promiseSigned: null as boolean | null,
+  cleaningRequired: null as boolean | null,
   moveInWater: "" as string | number,
   moveInElectric: "" as string | number,
   moveOutWater: "" as string | number,
   moveOutElectric: "" as string | number,
-  plannedMoveIn: new Date().toISOString().slice(0, 10),
+  plannedMoveIn: "",
   plannedMoveOut: "",
   specialNote: "",
   remark: "",
@@ -550,11 +550,11 @@ function openBed(room: Room, bed: Bed) {
   selectedBed.value = bed;
   editingStay.value = null;
   Object.assign(form, {
-    name: "", centerName: "", department: "", gender: "男", category: "",
+    name: "", centerName: "", department: "", gender: "", category: "",
     positionName: "", rankName: "", applicationCode: "", liaison: "",
-    bedType: "过渡房", threePiece: "", threePieceNote: "", costCut: false,
-    promiseSigned: false, cleaningRequired: false, moveInWater: "", moveInElectric: "",
-    moveOutWater: "", moveOutElectric: "", plannedMoveIn: today(), plannedMoveOut: "",
+    bedType: "", threePiece: "", threePieceNote: "", costCut: null,
+    promiseSigned: null, cleaningRequired: null, moveInWater: "", moveInElectric: "",
+    moveOutWater: "", moveOutElectric: "", plannedMoveIn: "", plannedMoveOut: "",
     specialNote: "", remark: "",
   });
   modal.value = true;
@@ -591,26 +591,26 @@ function selectReservation(stay: Stay) {
 function stayBody() {
   const numberOrNull = (value: string | number) => value === "" ? null : Number(value);
   return {
-    name: form.name,
+    name: form.name || "未填写",
     centerName: form.centerName,
-    department: form.department,
-    gender: form.gender,
-    category: form.category,
+    department: form.department || "未填写",
+    gender: form.gender || null,
+    category: form.category || null,
     positionName: form.positionName,
     rankName: form.rankName,
     applicationCode: form.applicationCode || null,
     liaison: form.liaison || null,
-    bedType: form.bedType,
+    bedType: form.bedType || null,
     threePiece: form.threePiece || null,
     threePieceNote: form.threePieceNote || null,
-    costCut: form.costCut,
+    costCut: form.costCut ?? false,
     promiseSigned: form.promiseSigned,
-    cleaningRequired: form.cleaningRequired,
+    cleaningRequired: form.cleaningRequired ?? false,
     moveInWater: numberOrNull(form.moveInWater),
     moveInElectric: numberOrNull(form.moveInElectric),
     moveOutWater: numberOrNull(form.moveOutWater),
     moveOutElectric: numberOrNull(form.moveOutElectric),
-    plannedMoveIn: form.plannedMoveIn,
+    plannedMoveIn: form.plannedMoveIn || null,
     plannedMoveOut: form.plannedMoveOut || null,
     specialNote: form.specialNote || null,
     remark: form.remark || null,
@@ -620,12 +620,23 @@ async function saveBooking() {
   if (!selectedBed.value) return;
   error.value = "";
   try {
+    const hasResidentDetails = [form.name, form.centerName, form.department, form.gender, form.category,
+      form.positionName, form.rankName, form.applicationCode, form.liaison, form.bedType, form.threePiece,
+      form.threePieceNote, form.moveInWater, form.moveInElectric, form.moveOutWater, form.moveOutElectric,
+      form.plannedMoveIn, form.plannedMoveOut, form.specialNote, form.remark].some((value) => value !== "" && value !== null);
+    if (!editingStay.value && form.cleaningRequired === true && !hasResidentDetails && form.costCut === null && form.promiseSigned === null) {
+      await dormitoryApi.setBedCleaning(selectedBed.value.id, true);
+      modal.value = false;
+      message.value = "床位已标记为待打扫";
+      await load();
+      return;
+    }
     const personBody = {
-      name: form.name,
+      name: form.name || "未填写",
       centerName: form.centerName,
-      department: form.department,
-      gender: form.gender,
-      category: form.category,
+      department: form.department || "未填写",
+      gender: form.gender || null,
+      category: form.category || null,
       positionName: form.positionName,
       rankName: form.rankName,
     };
@@ -2049,11 +2060,11 @@ onMounted(load);
           <small>选择人员可编辑保存；不选择则继续新增日期不冲突的后续预订。</small>
         </div>
         <div class="booking-grid">
-          <label>姓名<input v-model.trim="form.name" required /></label
+          <label>姓名<input v-model.trim="form.name" /></label
           ><label>中心<input v-model.trim="form.centerName" /></label
-          ><label>部门<input v-model.trim="form.department" required /></label
+          ><label>部门<input v-model.trim="form.department" /></label
           ><label
-            >性别<select v-model="form.gender">
+            >性别<select v-model="form.gender"><option value=""></option>
               <option>男</option>
               <option>女</option>
             </select></label
@@ -2061,7 +2072,7 @@ onMounted(load);
           ><label>岗位<input v-model.trim="form.positionName" /></label
           ><label>职级<input v-model.trim="form.rankName" /></label
           ><label
-            >床位类型<select v-model="form.bedType">
+            >床位类型<select v-model="form.bedType"><option value=""></option>
               <option>长住房</option>
               <option>过渡房</option>
               <option>客房</option>
@@ -2073,8 +2084,7 @@ onMounted(load);
           ><label
             >入住时间<input
               v-model="form.plannedMoveIn"
-              type="date"
-              required /></label
+              type="date" /></label
           ><label
             >计划退宿<input v-model="form.plannedMoveOut" type="date" /></label
           ><label>入住时水费度数<input v-model="form.moveInWater" type="number" min="0" step="0.01" /></label
@@ -2082,17 +2092,17 @@ onMounted(load);
           ><label>退房时水费度数<input v-model="form.moveOutWater" type="number" min="0" step="0.01" /></label
           ><label>退房时电费度数<input v-model="form.moveOutElectric" type="number" min="0" step="0.01" /></label
           ><label
-            >是否纳入降本 *<select v-model="form.costCut" required>
+            >是否纳入降本<select v-model="form.costCut"><option :value="null"></option>
               <option :value="true">是</option>
               <option :value="false">否</option>
             </select></label
           ><label
-            >是否已签承诺书 *<select v-model="form.promiseSigned" required>
+            >是否已签承诺书<select v-model="form.promiseSigned"><option :value="null"></option>
               <option :value="true">是</option>
               <option :value="false">否</option>
             </select></label
           ><label
-            >是否待打扫 *<select v-model="form.cleaningRequired" required>
+            >是否待打扫<select v-model="form.cleaningRequired"><option :value="null"></option>
               <option :value="true">是</option>
               <option :value="false">否</option>
             </select></label
@@ -2248,12 +2258,12 @@ onMounted(load);
         </button>
         <h3>编辑人员档案</h3>
         <div class="booking-grid">
-          <label>姓名<input v-model.trim="personForm.name" required /></label
+          <label>姓名<input v-model.trim="personForm.name" /></label
           ><label>中心<input v-model.trim="personForm.centerName" /></label
           ><label
-            >部门<input v-model.trim="personForm.department" required /></label
+            >部门<input v-model.trim="personForm.department" /></label
           ><label
-            >性别<select v-model="personForm.gender">
+            >性别<select v-model="personForm.gender"><option value=""></option>
               <option>男</option>
               <option>女</option>
             </select></label
