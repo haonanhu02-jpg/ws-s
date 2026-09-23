@@ -1029,38 +1029,16 @@ function exportLedger() {
   });
   return exportWorkbook(
     `${scope}_当前在住及预订人员台账`,
-    "当前人员台账",
-    [
-      "姓名",
-      "中心",
-      "部门",
-      "性别",
-      "类别",
-      "床位",
-      "三件套",
-      "状态",
-      "计划入住",
-      "计划退宿",
-    ],
-    currentStays.map((s) => [
-      s.person.name,
-      s.person.centerName,
-      s.person.department,
-      s.person.gender,
-      s.person.category,
-      bedDisplayName(s.bed),
-      s.threePiece || "",
-      statusLabel(s.status),
-      s.plannedMoveIn,
-      s.plannedMoveOut,
-    ]),
+    "完整入住数据",
+    FULL_STAY_HEADERS,
+    currentStays.map(fullStayRow),
   );
 }
 function exportPeople() {
   return exportWorkbook(
     "人员档案",
     "人员档案",
-    ["姓名", "中心", "部门", "性别", "类别", "岗位", "职级", "疑似重复"],
+    ["姓名", "中心", "部门", "性别", "人员类别", "岗位", "职级"],
     filteredPeople.value.map((p) => [
       p.name,
       p.centerName,
@@ -1069,7 +1047,6 @@ function exportPeople() {
       p.category,
       p.positionName,
       p.rankName,
-      duplicatePerson(p) ? "是" : "否",
     ]),
   );
 }
@@ -1618,7 +1595,7 @@ onMounted(load);
           </div></template
         >
         <template v-else-if="!loading && active === 'ledger'"
-          ><div class="ledger-heading"><div><span class="section-kicker">住宿业务</span><h2>入住人员台账</h2></div><div class="ledger-heading-right"><div class="ledger-heading-actions"><button class="secondary-button" @click="exportFullStays">导出全部历史明细</button><button class="secondary-button" @click="exportLedger">导出当前在住及预订</button><button class="secondary-button" @click="downloadImportTemplate('stays')">下载完整模板</button><button class="secondary-button" @click="chooseImport('stays')">导入入住数据</button><button class="secondary-button" @click="exportPeople">导出人员档案</button></div><div class="ledger-count"><b>{{ shownStays.length }}</b><span>{{ selectedBuilding ? '当前宿舍' : '全集团' }}</span></div></div></div>
+          ><div class="ledger-heading"><div><span class="section-kicker">住宿业务</span><h2>入住人员台账</h2></div><div class="ledger-heading-right"><div class="ledger-heading-actions"><button class="secondary-button" @click="exportFullStays">导出全部历史明细</button><button class="secondary-button" @click="exportLedger">导出当前在住及预订（完整字段）</button><button class="secondary-button" @click="downloadImportTemplate('stays')">下载完整模板</button><button class="secondary-button" @click="chooseImport('stays')">导入入住数据</button><button class="secondary-button" @click="exportPeople">导出基础人员档案（不含住宿）</button></div><div class="ledger-count"><b>{{ shownStays.length }}</b><span>{{ selectedBuilding ? '当前宿舍' : '全集团' }}</span></div></div></div>
           <div class="ledger-toolbar"><label><span>搜索台账</span><input v-model.trim="ledgerSearch" placeholder="输入姓名、部门、床位或状态" /></label><div class="ledger-legend"><span><i class="dot booked"></i>已预订</span><span><i class="dot living"></i>已入住</span><span><i class="dot done"></i>已退宿</span></div></div>
           <div class="table-wrap">
             <table>
