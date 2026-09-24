@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chooseBedStay, classifyRoomBeds, effectiveOccupancyStatus, hasVisibleOccupantName } from "./dormitoryOccupancy";
+import { chooseBedStay, classifyRoomBeds, effectiveBeds, effectiveOccupancyStatus, effectiveRooms, hasVisibleOccupantName } from "./dormitoryOccupancy";
 
 describe("dormitory occupancy presentation", () => {
   const businessDate = "2026-09-15";
@@ -31,5 +31,18 @@ describe("dormitory occupancy presentation", () => {
   it("assigns the empty bed in a twin room to the current occupant gender", () => {
     const man = { status: "BOOKED" as const, plannedMoveIn: "2026-09-13", person: { gender: "男" as const } };
     expect(classifyRoomBeds([man, undefined], businessDate)).toMatchObject({ occupiedMale: 1, freeMale: 1, freePending: 0 });
+  });
+
+  it("excludes disabled buildings, rooms and beds from every capacity statistic", () => {
+    const nodes = [
+      { building: { enabled: false }, rooms: [{ enabled: true, livable: true, beds: [{ id: 1, enabled: true }] }] },
+      { building: { enabled: true }, rooms: [
+        { enabled: false, livable: true, beds: [{ id: 2, enabled: true }] },
+        { enabled: true, livable: true, beds: [{ id: 3, enabled: true }, { id: 4, enabled: false }] },
+      ] },
+    ];
+    const rooms = effectiveRooms(nodes);
+    expect(rooms).toHaveLength(1);
+    expect(effectiveBeds(rooms).map((bed) => bed.id)).toEqual([3]);
   });
 });

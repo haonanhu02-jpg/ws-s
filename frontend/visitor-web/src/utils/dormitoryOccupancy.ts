@@ -45,3 +45,15 @@ export function classifyRoomBeds(stays: Array<GenderedStay | undefined>, busines
   }
   return result;
 }
+
+export interface EnabledBed { id: number; enabled: boolean }
+export interface EnabledRoom { enabled: boolean; livable: boolean; beds: EnabledBed[] }
+export interface EnabledBuildingNode { building: { enabled: boolean }; rooms: EnabledRoom[] }
+
+export function effectiveRooms<T extends EnabledRoom>(nodes: Array<{ building: { enabled: boolean }; rooms: T[] }>): T[] {
+  return nodes.filter((node) => node.building.enabled).flatMap((node) => node.rooms).filter((room) => room.enabled && room.livable);
+}
+
+export function effectiveBeds<T extends EnabledBed>(rooms: Array<{ beds: T[] }>): T[] {
+  return rooms.flatMap((room) => room.beds).filter((bed) => bed.enabled);
+}

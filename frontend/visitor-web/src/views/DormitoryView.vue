@@ -2,7 +2,7 @@
 import { computed, onMounted, reactive, ref } from "vue";
 import { useRouter } from "vue-router";
 import VisitorAccommodationPanel from "../components/VisitorAccommodationPanel.vue";
-import { chooseBedStay, classifyRoomBeds, effectiveOccupancyStatus, hasVisibleOccupantName } from "../utils/dormitoryOccupancy";
+import { chooseBedStay, classifyRoomBeds, effectiveBeds, effectiveOccupancyStatus, effectiveRooms, hasVisibleOccupantName } from "../utils/dormitoryOccupancy";
 import {
   dormitoryApi,
   dormitoryExtensionApi,
@@ -142,6 +142,9 @@ const shownBuildings = computed(() =>
     ? buildings.value.filter((n) => n.building.id === selectedBuilding.value)
     : buildings.value,
 );
+const effectiveShownRooms = computed(() => effectiveRooms(shownBuildings.value));
+const effectiveShownBeds = computed(() => effectiveBeds(effectiveShownRooms.value));
+const effectiveShownBedIds = computed(() => new Set(effectiveShownBeds.value.map((bed) => bed.id)));
 const selectedBedIds = computed(() =>
   new Set(shownBuildings.value.flatMap((n) => n.rooms.flatMap((r) => r.beds.map((b) => b.id)))),
 );
@@ -152,8 +155,8 @@ const shownStays = computed(() =>
 );
 const shownTotals = computed(() => {
   const enabledBuildings = shownBuildings.value.filter((n) => n.building.enabled);
-  const rooms = enabledBuildings.flatMap((n) => n.rooms).filter((r) => r.enabled && r.livable);
-  const beds = rooms.flatMap((r) => r.beds).filter((b) => b.enabled);
+  const rooms = effectiveShownRooms.value;
+  const beds = effectiveShownBeds.value;
   const displayed = beds.map((bed) => displayStayForBed(bed.id)).filter((stay): stay is Stay => Boolean(stay));
   const booked = displayed.filter((stay) => effectiveStayStatus(stay) === "BOOKED").length;
   const occupied = displayed.filter((stay) => effectiveStayStatus(stay) === "CHECKED_IN").length;
@@ -218,7 +221,7 @@ const costCutNights = computed(() => costCutRows.value.reduce((sum, row) => sum 
 const capacityRows = computed(() => {
   const labels = ["单间", "标间"];
   return labels.map((label) => {
-    const rooms = shownBuildings.value.flatMap((node) => node.rooms).filter((room) => room.livable && room.roomType.includes(label));
+    const rooms = effectiveShownRooms.value.filter((room) => room.roomType.includes(label));
     const row = { label, freePending: 0, freeMale: 0, freeFemale: 0, occupiedMale: 0, occupiedFemale: 0, bookedMale: 0, bookedFemale: 0 };
     for (const room of rooms) {
       const roomCounts = classifyRoomBeds(room.beds.filter((bed) => bed.enabled).map((bed) => displayStayForBed(bed.id)), today());
@@ -237,15 +240,15 @@ const capacityTotal = computed(() => capacityRows.value.reduce((total, row) => (
   bookedMale: total.bookedMale + row.bookedMale,
   bookedFemale: total.bookedFemale + row.bookedFemale,
 }), { label: "合计", freePending: 0, freeMale: 0, freeFemale: 0, occupiedMale: 0, occupiedFemale: 0, bookedMale: 0, bookedFemale: 0 }));
-const shownBuildingStatistics = computed(() => shownBuildings.value.map((node) => {
-  const beds = node.rooms.filter((room) => room.livable).flatMap((room) => room.beds).filter((bed) => bed.enabled);
+const shownBuildingStatistics = computed(() => shownBuildings.value.filter((node) => node.building.enabled).map((node) => {
+  const beds = effectiveBeds(node.rooms.filter((room) => room.enabled && room.livable));
   const active = beds.filter((bed) => Boolean(displayStayForBed(bed.id))).length;
   return { name: node.building.name, total: beds.length, active };
 }));
 const shownCategories = computed(() => {
   if (selectedBuilding.value === null) return statistics.value?.categories ?? [];
   const names = new Map<string, { name: string; total: number; active: number }>();
-  for (const stay of shownStays.value) {
+  for (const stay of shownStays.value.filter((item) => effectiveShownBedIds.value.has(item.bed.id))) {
     const name = stay.person.category || "未分类";
     const item = names.get(name) ?? { name, total: 0, active: 0 };
     item.total += 1;
@@ -261,7 +264,7 @@ const shownStatuses = computed(() => {
     CHECKED_OUT: "已退宿",
     CANCELLED: "已取消",
   };
-  const displayed = shownBuildings.value.flatMap((node) => node.rooms).flatMap((room) => room.beds.filter((bed) => bed.enabled))
+  const displayed = effectiveShownBeds.value
     .map((bed) => displayStayForBed(bed.id)).filter((stay): stay is Stay => Boolean(stay));
   return Object.entries(labels).map(([status, name]) => ({ name, total:
     status === "BOOKED" || status === "CHECKED_IN"
@@ -487,14 +490,13 @@ async function loadMeters() {
   ]);
   meterReadings.value = current;
   previousReadings.value = previous;
-  for (const n of buildings.value)
-    for (const r of n.rooms.filter((x) => x.livable)) {
+  for (const r of effectiveRooms(buildings.value)) {
       const v = current.find((x) => x.roomId === r.id);
       meterValues[r.id] = {
         water: v?.waterEnd?.toString() || "",
         electric: v?.electricEnd?.toString() || "",
       };
-    }
+  }
 }
 async function loadFees(){settlementEntries.value=await dormitoryExtensionApi.settlements(settlementAllMonths.value?'':meterMonth.value,settlementPerson.value,selectedBuilding.value)}
 async function changeMeterMonth() {
@@ -525,11 +527,8 @@ function usage(roomId: number, key: "waterEnd" | "electricEnd") {
   return Math.max(0, Number(current) - Number(previous)).toFixed(2);
 }
 async function saveMeters() {
-  const rows = buildings.value
-    .flatMap((n) => n.rooms)
-    .filter(
+  const rows = effectiveRooms(buildings.value).filter(
       (r) =>
-        r.livable &&
         meterValues[r.id] &&
         (meterValues[r.id].water !== "" || meterValues[r.id].electric !== ""),
     )
@@ -1092,32 +1091,60 @@ function exportHistory() {
   );
 }
 function exportMeters() {
+  const currentByRoom = new Map(meterReadings.value.map((reading) => [reading.roomId, reading]));
+  const previousByRoom = new Map(previousReadings.value.map((reading) => [reading.roomId, reading]));
   return exportWorkbook(
     `水电抄表_${meterMonth.value}`,
     "水电抄表",
     [
-      "月份",
-      "楼栋",
       "房号",
-      "水表读数",
-      "本月用水",
-      "电表读数",
-      "本月用电",
-      "操作人",
-      "抄表日期",
+      "水表月初读数(吨)", "水表月末读数(吨)", "本月用水(吨)",
+      "电表月初读数(度)", "电表月末读数(度)", "本月用电(度)", "水电表抄表日期",
     ],
-    meterReadings.value.map((m) => [
-      m.readingMonth,
-      m.buildingName,
-      m.roomNo,
-      m.waterEnd,
-      usage(m.roomId, "waterEnd"),
-      m.electricEnd,
-      usage(m.roomId, "electricEnd"),
-      m.operatorName,
-      localTime(m.updatedAt || ""),
-    ]),
+    effectiveShownRooms.value.map((room) => {
+      const node = shownBuildings.value.find((item) => item.building.id === room.buildingId);
+      const current = currentByRoom.get(room.id), previous = previousByRoom.get(room.id);
+      return [`${node?.building.name || ""}-${room.roomNo}`, previous?.waterEnd, current?.waterEnd,
+        usage(room.id, "waterEnd"), previous?.electricEnd, current?.electricEnd,
+        usage(room.id, "electricEnd"), current?.updatedAt ? localTime(current.updatedAt) : ""];
+    }),
   );
+}
+function downloadMeterTemplate() {
+  return exportWorkbook(`水电抄表导入模板_${meterMonth.value}`, "水电抄表",
+    ["房号", "水表月初读数(吨)", "水表月末读数(吨)", "本月用水(吨)", "电表月初读数(度)", "电表月末读数(度)", "本月用电(度)", "水电表抄表日期"],
+    effectiveShownRooms.value.map((room) => {
+      const node = shownBuildings.value.find((item) => item.building.id === room.buildingId);
+      const previous = previousReadings.value.find((item) => item.roomId === room.id);
+      return [`${node?.building.name || ""}-${room.roomNo}`, previous?.waterEnd, "", "", previous?.electricEnd, "", "", today()];
+    }));
+}
+async function chooseMeterImport() {
+  const input = document.createElement("input"); input.type = "file"; input.accept = ".xlsx";
+  input.onchange = async () => {
+    const file = input.files?.[0]; if (!file) return;
+    try {
+      const ExcelJS = (await import("exceljs")).default; const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(await file.arrayBuffer()); const sheet = workbook.worksheets[0];
+      if (!sheet) throw new Error("Excel 中没有工作表");
+      const headers = (sheet.getRow(1).values as unknown[]).slice(1).map((value, index) => excelCellText(value, index));
+      const roomColumn = headers.indexOf("房号"), waterColumn = headers.indexOf("水表月末读数(吨)"), electricColumn = headers.indexOf("电表月末读数(度)");
+      if (roomColumn < 0 || waterColumn < 0 || electricColumn < 0) throw new Error("模板必须包含房号、水表月末读数(吨)、电表月末读数(度)");
+      const rooms = new Map<string, Room>();
+      for (const node of buildings.value.filter((item) => item.building.enabled)) for (const room of node.rooms.filter((item) => item.enabled && item.livable)) rooms.set(`${node.building.name}-${room.roomNo}`, room);
+      const issues: string[] = []; let imported = 0;
+      sheet.eachRow((row, rowNumber) => {
+        if (rowNumber === 1) return;
+        const values = (row.values as unknown[]).slice(1).map((value, index) => excelCellText(value, index)); if (!values.some(Boolean)) return;
+        const room = rooms.get(values[roomColumn]); if (!room) { issues.push(`第${rowNumber}行：找不到启用房间“${values[roomColumn]}”`); return; }
+        const parse = (value: string, field: string) => { if (!value) return ""; const number = Number(value); if (!Number.isFinite(number) || number < 0) issues.push(`第${rowNumber}行：${field}必须是大于或等于0的数字`); return Number.isFinite(number) && number >= 0 ? String(number) : ""; };
+        meterValues[room.id] = { water: parse(values[waterColumn], "水表月末读数"), electric: parse(values[electricColumn], "电表月末读数") }; imported += 1;
+      });
+      if (issues.length) throw new Error(`水电表导入失败：\n• ${issues.slice(0, 20).join("\n• ")}`);
+      if (!imported) throw new Error("Excel 中没有可导入的数据");
+      message.value = `已导入${imported}间房的读数，请核对后点击“保存抄表”`;
+    } catch (e) { error.value = e instanceof Error ? e.message : "水电表导入失败"; }
+  }; input.click();
 }
 async function deleteStay(s: Stay) {
   if (!confirm(`确认永久删除 ${s.person.name} 的这条${statusLabel(s.status)}住宿记录？删除后无法恢复。`)) return;
@@ -1778,13 +1805,15 @@ onMounted(load);
             <div class="rp-actions">
               <label class="rp-field">月份<input v-model="meterMonth" type="month" @change="changeMeterMonth" /></label>
               <button class="secondary-button" @click="changeMeterMonth">确定</button>
+              <button class="secondary-button" @click="downloadMeterTemplate">下载抄表模板</button>
+              <button class="secondary-button" @click="chooseMeterImport">导入水电数据</button>
               <button class="secondary-button" @click="exportMeters">导出水电抄表</button>
             </div>
           </div>
           <div class="rp-save-bar"><button class="rp-save" @click="saveMeters"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8"/><path d="M7 3v5h8"/></svg>保存抄表</button></div>
           <div class="rp-strip"><span class="dot"></span>提示：录入读数后请保存抄表，系统将自动生成水电费用台账。</div>
           <div
-            v-for="node in shownBuildings"
+            v-for="node in shownBuildings.filter((item) => item.building.enabled)"
             :key="node.building.id"
             class="resource-setting"
           >
@@ -1799,19 +1828,22 @@ onMounted(load);
                 <thead>
                   <tr>
                     <th>房号</th>
+                    <th>水表月初读数(吨)</th>
                     <th>水表月末读数(吨)</th>
-                    <th>本月用水</th>
+                    <th>本月用水(吨)</th>
+                    <th>电表月初读数(度)</th>
                     <th>电表月末读数(度)</th>
-                    <th>本月用电</th>
+                    <th>本月用电(度)</th>
                     <th>水电表抄表日期</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr
-                    v-for="room in node.rooms.filter((r) => r.livable)"
+                    v-for="room in node.rooms.filter((r) => r.enabled && r.livable)"
                     :key="room.id"
                   >
-                    <td>{{ room.roomNo }}</td>
+                    <td>{{ node.building.name }}-{{ room.roomNo }}</td>
+                    <td>{{ previousReadings.find((x) => x.roomId === room.id)?.waterEnd ?? '-' }}</td>
                     <td>
                       <input
                         v-model="meterValues[room.id].water"
@@ -1822,6 +1854,7 @@ onMounted(load);
                       />
                     </td>
                     <td>{{ usage(room.id, "waterEnd") }}</td>
+                    <td>{{ previousReadings.find((x) => x.roomId === room.id)?.electricEnd ?? '-' }}</td>
                     <td>
                       <input
                         v-model="meterValues[room.id].electric"
