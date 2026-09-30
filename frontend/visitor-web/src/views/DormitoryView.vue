@@ -526,7 +526,7 @@ function usage(roomId: number, key: "waterEnd" | "electricEnd") {
     previous === null
   )
     return "-";
-  return Math.max(0, Number(current) - Number(previous)).toFixed(2);
+  return Math.abs(Number(current) - Number(previous)).toFixed(2);
 }
 async function saveMeters() {
   const rows = effectiveRooms(buildings.value).filter(
@@ -1897,7 +1897,7 @@ onMounted(load);
             </div>
           </div>
           <section class="fee-section">
-            <div class="section-title"><div><h3>月底员工水电结算</h3><small>水费15元/吨；电费0.7元/度；每房每月免费电量5度。结算记录锁定，修正须冲正后重新生成。</small></div><div class="row-actions"><button class="secondary-button" @click="exportFees">导出Excel</button><button @click="generateFees">生成本月结算</button></div></div>
+            <div class="section-title"><div><h3>月底员工水电结算</h3><small>水费15元/吨；电费0.7元/度；盛心公寓每房每月免费电量10度，伏龙宿舍每房每月免费电量5度。结算记录锁定，修正须冲正后重新生成。</small></div><div class="row-actions"><button class="secondary-button" @click="exportFees">导出Excel</button><button @click="generateFees">生成本月结算</button></div></div>
             <div class="fee-rule-grid"><label>查询人员<input v-model="settlementPerson" placeholder="姓名或部门" @keyup.enter="loadFees"/></label><label class="choice"><input v-model="settlementAllMonths" type="checkbox" @change="loadFees"/> 查询全部月份</label><button class="secondary-button" @click="loadFees">查询</button></div>
             <div class="table-wrap"><table><thead><tr><th>月份/批次</th><th>人员</th><th>楼栋/房间</th><th>居住/计费天数</th><th>水量/水费</th><th>电量/免费抵扣</th><th>应付电费</th><th>合计</th><th>类型</th><th>操作</th></tr></thead><tbody><tr v-for="e in settlementEntries" :key="e.id"><td>{{e.billingMonth}} / {{e.batchId}}</td><td>{{e.personName}}<small>{{e.department}}</small></td><td>{{e.buildingName}} / {{e.roomNo}}</td><td>{{e.occupiedDays}} / {{e.chargeableDays}}</td><td>{{e.waterUsage}} / ¥{{e.waterAmount}}</td><td>{{e.electricUsage}} / {{e.freeElectricUsage}}度（¥{{e.freeElectricAmount}}）</td><td>¥{{e.electricAmount}}</td><td><b>¥{{e.totalAmount}}</b></td><td>{{e.batchStatus==='REVERSAL'?'冲正':'正常结算'}}</td><td><button v-if="e.batchStatus==='GENERATED'" class="secondary" @click="reverseFee(e.batchId)">冲正本批次</button></td></tr><tr v-if="!settlementEntries.length"><td colspan="10" class="empty-cell">暂无结算记录。生成前需保存本月及上月水电表读数。</td></tr></tbody></table></div>
           </section></template
