@@ -14,7 +14,7 @@ final class EmployeeDormitoryModels {
  record ResourceTree(List<BuildingNode> buildings) {}
  record ResourceAudit(Long id,String resourceType,Long resourceId,String action,String beforeValue,String afterValue,String operatorName,Instant operatedAt) {}
  record StayAudit(Long id,Long stayId,String personName,String action,String oldBedCode,String newBedCode,String beforeStatus,String afterStatus,String operatorName,String reason,Instant operatedAt) {}
- record MeterReading(Long id,Long buildingId,String buildingName,Long roomId,String roomNo,String readingMonth,BigDecimal waterEnd,BigDecimal electricEnd,String operatorName,Instant updatedAt) {}
+ record MeterReading(Long id,Long buildingId,String buildingName,Long roomId,String roomNo,String readingMonth,BigDecimal waterStart,BigDecimal waterEnd,BigDecimal electricStart,BigDecimal electricEnd,LocalDate readingDate,String operatorName,Instant updatedAt) {}
  record ImportSummary(int received,int peopleCreated,int buildingsCreated,int roomsCreated,int bedsCreated,List<String> skipped) {}
  record StatisticsSummary(int people,int buildings,int rooms,int beds,int booked,int checkedIn,int checkedOut,int cancelled,int freeBeds) {}
  record StatisticsItem(String name,int total,int active) {}
@@ -42,7 +42,9 @@ final class EmployeeDormitoryModels {
  record TransferCommand(@NotNull Long bedId,String reason) {}
  record ExtendCommand(@NotNull LocalDate plannedMoveOut,String reason) {}
  record CheckoutCommand(@PositiveOrZero BigDecimal moveOutWater,@PositiveOrZero BigDecimal moveOutElectric,String reason) {}
- record MeterReadingCommand(@NotNull Long roomId,@NotBlank @Pattern(regexp="\\d{4}-(0[1-9]|1[0-2])") String readingMonth,@PositiveOrZero BigDecimal waterEnd,@PositiveOrZero BigDecimal electricEnd) {}
+ record MeterReadingCommand(@NotNull Long roomId,@NotBlank @Pattern(regexp="\\d{4}-(0[1-9]|1[0-2])") String readingMonth,@PositiveOrZero BigDecimal waterStart,@PositiveOrZero BigDecimal waterEnd,@PositiveOrZero BigDecimal electricStart,@PositiveOrZero BigDecimal electricEnd,LocalDate readingDate) {
+  MeterReadingCommand(Long roomId,String readingMonth,BigDecimal waterEnd,BigDecimal electricEnd){this(roomId,readingMonth,null,waterEnd,null,electricEnd,null);}
+ }
  record FeeRuleCommand(@NotNull @PositiveOrZero BigDecimal waterPrice,@NotNull @PositiveOrZero BigDecimal electricPrice,@NotNull @PositiveOrZero BigDecimal freeWater,@NotNull @PositiveOrZero BigDecimal freeElectric,@NotNull Boolean enabled) {}
  record FeeBillCommand(@NotNull BigDecimal adjustment,String remark,@NotBlank @Pattern(regexp="DRAFT|CONFIRMED") String status) {}
  record FeeReversalCommand(@NotBlank String reason) {}

@@ -103,7 +103,7 @@ const form = reactive({
 const meterMonth = ref(new Date().toISOString().slice(0, 7)),
   meterReadings = ref<MeterReading[]>([]),
   previousReadings = ref<MeterReading[]>([]),
-  meterValues = reactive<Record<number, { water: string; electric: string }>>(
+  meterValues = reactive<Record<number, { waterStart: string; waterEnd: string; electricStart: string; electricEnd: string; readingDate: string }>>(
     {},
   );
 const resourceModal = ref(false),
@@ -492,9 +492,13 @@ async function loadMeters() {
   previousReadings.value = previous;
   for (const r of effectiveRooms(buildings.value)) {
       const v = current.find((x) => x.roomId === r.id);
+      const previousReading = previous.find((x) => x.roomId === r.id);
       meterValues[r.id] = {
-        water: v?.waterEnd?.toString() || "",
-        electric: v?.electricEnd?.toString() || "",
+        waterStart: v?.waterStart?.toString() ?? previousReading?.waterEnd?.toString() ?? "",
+        waterEnd: v?.waterEnd?.toString() || "",
+        electricStart: v?.electricStart?.toString() ?? previousReading?.electricEnd?.toString() ?? "",
+        electricEnd: v?.electricEnd?.toString() || "",
+        readingDate: v?.readingDate || "",
       };
   }
 }
@@ -512,11 +516,9 @@ async function openAttachments(stay:Stay){attachmentStay.value=stay;attachmentMo
 async function uploadAttachment(){if(!attachmentStay.value||!attachmentFile.value){error.value='请选择附件';return}try{await dormitoryExtensionApi.uploadAttachment(attachmentStay.value.id,attachmentType.value,attachmentFile.value);attachments.value=await dormitoryExtensionApi.attachments(attachmentStay.value.id);attachmentFile.value=null;message.value='附件已上传'}catch(e){error.value=e instanceof Error?e.message:'附件上传失败'}}
 async function deleteAttachment(a:StayAttachment){if(!confirm(`确认删除 ${a.originalName}？`))return;await dormitoryExtensionApi.deleteAttachment(a.id);if(attachmentStay.value)attachments.value=await dormitoryExtensionApi.attachments(attachmentStay.value.id)}
 function usage(roomId: number, key: "waterEnd" | "electricEnd") {
-  const current =
-    meterValues[roomId]?.[key === "waterEnd" ? "water" : "electric"];
-  const previous = previousReadings.value.find((r) => r.roomId === roomId)?.[
-    key
-  ];
+  const current = meterValues[roomId]?.[key];
+  const startKey = key === "waterEnd" ? "waterStart" : "electricStart";
+  const previous = meterValues[roomId]?.[startKey];
   if (
     current === "" ||
     current === undefined ||
@@ -530,17 +532,19 @@ async function saveMeters() {
   const rows = effectiveRooms(buildings.value).filter(
       (r) =>
         meterValues[r.id] &&
-        (meterValues[r.id].water !== "" || meterValues[r.id].electric !== ""),
+        (meterValues[r.id].waterStart !== "" || meterValues[r.id].waterEnd !== "" || meterValues[r.id].electricStart !== "" || meterValues[r.id].electricEnd !== ""),
     )
     .map((r) => ({
       roomId: r.id,
       readingMonth: meterMonth.value,
-      waterEnd:
-        meterValues[r.id].water === "" ? null : Number(meterValues[r.id].water),
+      waterStart: meterValues[r.id].waterStart === "" ? null : Number(meterValues[r.id].waterStart),
+      waterEnd: meterValues[r.id].waterEnd === "" ? null : Number(meterValues[r.id].waterEnd),
+      electricStart: meterValues[r.id].electricStart === "" ? null : Number(meterValues[r.id].electricStart),
       electricEnd:
-        meterValues[r.id].electric === ""
+        meterValues[r.id].electricEnd === ""
           ? null
-          : Number(meterValues[r.id].electric),
+          : Number(meterValues[r.id].electricEnd),
+      readingDate: meterValues[r.id].readingDate || null,
     }));
   if (!rows.length) {
     error.value = "请至少录入一间房的抄表数据";
@@ -1104,9 +1108,9 @@ function exportMeters() {
     effectiveShownRooms.value.map((room) => {
       const node = shownBuildings.value.find((item) => item.building.id === room.buildingId);
       const current = currentByRoom.get(room.id), previous = previousByRoom.get(room.id);
-      return [`${node?.building.name || ""}-${room.roomNo}`, previous?.waterEnd, current?.waterEnd,
-        usage(room.id, "waterEnd"), previous?.electricEnd, current?.electricEnd,
-        usage(room.id, "electricEnd"), current?.updatedAt ? localTime(current.updatedAt) : ""];
+      return [`${node?.building.name || ""}-${room.roomNo}`, current?.waterStart ?? previous?.waterEnd, current?.waterEnd,
+        usage(room.id, "waterEnd"), current?.electricStart ?? previous?.electricEnd, current?.electricEnd,
+        usage(room.id, "electricEnd"), formatMeterDate(current?.readingDate || "")];
     }),
   );
 }
@@ -1116,8 +1120,23 @@ function downloadMeterTemplate() {
     effectiveShownRooms.value.map((room) => {
       const node = shownBuildings.value.find((item) => item.building.id === room.buildingId);
       const previous = previousReadings.value.find((item) => item.roomId === room.id);
-      return [`${node?.building.name || ""}-${room.roomNo}`, previous?.waterEnd, "", "", previous?.electricEnd, "", "", today()];
+      return [`${node?.building.name || ""}-${room.roomNo}`, previous?.waterEnd, "", "", previous?.electricEnd, "", "", formatMeterDate(today())];
     }));
+}
+function formatMeterDate(value: string): string {
+  if (!value) return "";
+  const match = value.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  return match ? `${match[1]}/${match[2].padStart(2, "0")}/${match[3].padStart(2, "0")}` : value;
+}
+function parseMeterDate(value: unknown): string {
+  if (value instanceof Date) return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
+  if (typeof value === "number" && value > 20000 && value < 80000) return new Date(Math.round((value - 25569) * 86400 * 1000)).toISOString().slice(0, 10);
+  const text = excelCellText(value, 7).trim();
+  const match = text.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
+  if (!match) return "";
+  const iso = `${match[1]}-${match[2].padStart(2, "0")}-${match[3].padStart(2, "0")}`;
+  const date = new Date(`${iso}T00:00:00Z`);
+  return Number.isNaN(date.valueOf()) || date.toISOString().slice(0, 10) !== iso ? "" : iso;
 }
 async function chooseMeterImport() {
   const input = document.createElement("input"); input.type = "file"; input.accept = ".xlsx";
@@ -1128,17 +1147,23 @@ async function chooseMeterImport() {
       await workbook.xlsx.load(await file.arrayBuffer()); const sheet = workbook.worksheets[0];
       if (!sheet) throw new Error("Excel 中没有工作表");
       const headers = (sheet.getRow(1).values as unknown[]).slice(1).map((value, index) => excelCellText(value, index));
-      const roomColumn = headers.indexOf("房号"), waterColumn = headers.indexOf("水表月末读数(吨)"), electricColumn = headers.indexOf("电表月末读数(度)");
-      if (roomColumn < 0 || waterColumn < 0 || electricColumn < 0) throw new Error("模板必须包含房号、水表月末读数(吨)、电表月末读数(度)");
+      const roomColumn = headers.indexOf("房号"), waterStartColumn = headers.indexOf("水表月初读数(吨)"), waterEndColumn = headers.indexOf("水表月末读数(吨)"), electricStartColumn = headers.indexOf("电表月初读数(度)"), electricEndColumn = headers.indexOf("电表月末读数(度)"), dateColumn = headers.indexOf("水电表抄表日期");
+      if ([roomColumn, waterStartColumn, waterEndColumn, electricStartColumn, electricEndColumn, dateColumn].some((column) => column < 0)) throw new Error("模板必须包含房号、水电表月初/月末读数及水电表抄表日期");
       const rooms = new Map<string, Room>();
       for (const node of buildings.value.filter((item) => item.building.enabled)) for (const room of node.rooms.filter((item) => item.enabled && item.livable)) rooms.set(`${node.building.name}-${room.roomNo}`, room);
       const issues: string[] = []; let imported = 0;
       sheet.eachRow((row, rowNumber) => {
         if (rowNumber === 1) return;
-        const values = (row.values as unknown[]).slice(1).map((value, index) => excelCellText(value, index)); if (!values.some(Boolean)) return;
+        const rawValues = (row.values as unknown[]).slice(1);
+        const values = rawValues.map((value, index) => excelCellText(value, index)); if (!values.some(Boolean)) return;
         const room = rooms.get(values[roomColumn]); if (!room) { issues.push(`第${rowNumber}行：找不到启用房间“${values[roomColumn]}”`); return; }
         const parse = (value: string, field: string) => { if (!value) return ""; const number = Number(value); if (!Number.isFinite(number) || number < 0) issues.push(`第${rowNumber}行：${field}必须是大于或等于0的数字`); return Number.isFinite(number) && number >= 0 ? String(number) : ""; };
-        meterValues[room.id] = { water: parse(values[waterColumn], "水表月末读数"), electric: parse(values[electricColumn], "电表月末读数") }; imported += 1;
+        const readingDate = parseMeterDate(rawValues[dateColumn]);
+        if (values[dateColumn] && !readingDate) issues.push(`第${rowNumber}行：水电表抄表日期必须使用年/月/日格式，例如2026/09/30`);
+        meterValues[room.id] = {
+          waterStart: parse(values[waterStartColumn], "水表月初读数"), waterEnd: parse(values[waterEndColumn], "水表月末读数"),
+          electricStart: parse(values[electricStartColumn], "电表月初读数"), electricEnd: parse(values[electricEndColumn], "电表月末读数"), readingDate,
+        }; imported += 1;
       });
       if (issues.length) throw new Error(`水电表导入失败：\n• ${issues.slice(0, 20).join("\n• ")}`);
       if (!imported) throw new Error("Excel 中没有可导入的数据");
@@ -1843,10 +1868,10 @@ onMounted(load);
                     :key="room.id"
                   >
                     <td>{{ node.building.name }}-{{ room.roomNo }}</td>
-                    <td>{{ previousReadings.find((x) => x.roomId === room.id)?.waterEnd ?? '-' }}</td>
+                    <td><input v-model="meterValues[room.id].waterStart" class="meter-input" type="number" min="0" step="0.01" /></td>
                     <td>
                       <input
-                        v-model="meterValues[room.id].water"
+                        v-model="meterValues[room.id].waterEnd"
                         class="meter-input"
                         type="number"
                         min="0"
@@ -1854,10 +1879,10 @@ onMounted(load);
                       />
                     </td>
                     <td>{{ usage(room.id, "waterEnd") }}</td>
-                    <td>{{ previousReadings.find((x) => x.roomId === room.id)?.electricEnd ?? '-' }}</td>
+                    <td><input v-model="meterValues[room.id].electricStart" class="meter-input" type="number" min="0" step="0.01" /></td>
                     <td>
                       <input
-                        v-model="meterValues[room.id].electric"
+                        v-model="meterValues[room.id].electricEnd"
                         class="meter-input"
                         type="number"
                         min="0"
@@ -1865,14 +1890,7 @@ onMounted(load);
                       />
                     </td>
                     <td>{{ usage(room.id, "electricEnd") }}</td>
-                    <td>
-                      {{
-                        localTime(
-                          meterReadings.find((x) => x.roomId === room.id)
-                            ?.updatedAt || "",
-                        )
-                      }}
-                    </td>
+                    <td><input v-model="meterValues[room.id].readingDate" class="meter-input" type="date" /></td>
                   </tr>
                 </tbody>
               </table>
