@@ -1,5 +1,12 @@
 # Backend dependency download diagnostics
 
+Docker builds explicitly load `deploy/maven-settings.xml`, using the Aliyun
+HTTPS mirror for repository ID `central` (including Central plugin dependencies).
+Other repository IDs and host Maven settings are not changed. Existing cache
+contents are retained. Logs should show `Downloading from aliyun-central`.
+Override the build argument `MAVEN_CENTRAL_MIRROR_URL` to use an internal mirror
+or `https://repo.maven.apache.org/maven2` instead.
+
 The backend Docker build keeps Maven batch download messages enabled. A stalled
 download should leave its repository and artifact URL in the plain build log.
 Maven HTTP connection timeout defaults to 10 seconds, read inactivity timeout to
