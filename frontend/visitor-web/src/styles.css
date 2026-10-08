@@ -342,10 +342,11 @@ th:last-child,td:last-child{border-right:0}th{background:#f5f6f8;color:#4b5563;f
 .dormitory-layout .booking-grid label{gap:7px;color:var(--d86-text-2);font-size:13px}.dormitory-layout .booking-grid input,.dormitory-layout .booking-grid select,.dormitory-layout .booking-grid textarea{min-height:42px;border-radius:7px;background:#fff}.dormitory-layout .booking-grid .choice{min-height:42px;padding:10px 12px;border:1px solid var(--d86-line);border-radius:7px;background:var(--d86-surface-2)}.dormitory-layout .modal-card>button:last-child{width:auto;margin:0 20px 18px auto;padding:9px 24px}
 @media(max-width:760px){.dormitory-layout .ledger-heading,.dormitory-layout .ledger-toolbar,.dormitory-layout .people-head{align-items:stretch;flex-direction:column}.dormitory-layout .ledger-toolbar input,.dormitory-layout .pretty-search input{width:100%}.dormitory-layout .ledger-legend{padding:0}.dormitory-layout .people-head .row-actions{display:flex;flex-wrap:wrap}.dormitory-layout .people-head .pretty-search{width:100%}}
 
-/* Keep the complete region selector on one horizontal line. */
+/* Dormitory selectors are peers; only the group includes every dormitory. */
 .dormitory-layout .region-tabs{min-width:0;flex-direction:row;align-items:center;justify-content:flex-start;gap:8px;overflow-x:auto;overflow-y:hidden;white-space:nowrap}
 .dormitory-layout .region-primary,.dormitory-layout .region-sub{flex:0 0 auto;align-self:center;flex-wrap:nowrap}
 .dormitory-layout .region-sub{padding-left:0}
+.dormitory-layout .region-sub button{padding:0 16px;font-size:14px}
 @media(max-width:640px){.dormitory-layout .region-tabs{flex-direction:row}.dormitory-layout .region-primary,.dormitory-layout .region-sub{flex-wrap:nowrap}}
 
 /* 8.6 mobile layout: header and navigation become compact horizontal bands. */
@@ -1095,4 +1096,15 @@ tbody tr:hover { background: var(--d86-brand-soft); }
   .dormitory-layout .ledger-heading { align-items: flex-start; }
   .dormitory-layout .ledger-heading-right { width: 100%; }
   .dormitory-layout .ledger-heading-actions { grid-template-columns: repeat(2,minmax(160px,1fr)); }
+}
+
+/* Final shell rules: navigation follows scrolling below the measured header. */
+.dormitory-layout .dorm-head{position:sticky;top:0;z-index:12}
+.dormitory-layout .dorm-nav{position:fixed;top:var(--dorm-head-height,56px);left:0;bottom:auto;margin:0;width:176px;height:calc(100dvh - var(--dorm-head-height,56px));min-height:0;overflow-y:auto;z-index:11}
+.dormitory-layout .dorm-content{grid-column:2}
+.dormitory-layout .statistics-grid{grid-template-columns:minmax(0,1fr)}
+@media(max-width:760px){
+  .dormitory-layout .dorm-shell{display:block}
+  .dormitory-layout .dorm-content{grid-column:auto}
+  .dormitory-layout .dorm-nav{position:sticky;top:var(--dorm-head-height,56px);width:100%;height:auto;min-height:0;flex-direction:row;overflow-x:auto;overflow-y:hidden}
 }

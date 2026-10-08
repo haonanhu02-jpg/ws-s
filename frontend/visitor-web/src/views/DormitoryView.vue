@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, onMounted, onBeforeUnmount, reactive, ref } from "vue";
 import { useRouter } from "vue-router";
 import VisitorAccommodationPanel from "../components/VisitorAccommodationPanel.vue";
 import { chooseBedStay, classifyRoomBeds, effectiveBeds, effectiveOccupancyStatus, effectiveRooms, hasVisibleOccupantName } from "../utils/dormitoryOccupancy";
@@ -137,10 +137,25 @@ const settlementEntries=ref<FeeSettlementEntry[]>([]),settlementPerson=ref(''),s
 const costCutStart = ref(`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}-01`);
 const costCutEnd = ref(new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai" }).format(new Date()));
 const costCutFilter = ref<"all" | "yes" | "no">("all");
+const dormHeader = ref<HTMLElement | null>(null);
+const dormHeaderHeight = ref(56);
+let headerObserver: ResizeObserver | undefined;
+function buildingRank(name: string): number {
+  if (name.includes("盛心")) return 0;
+  if (name.includes("伏龙")) return 1;
+  if (name.includes("花城")) return 2;
+  if (/[岙吞]底罗|万盛空间/.test(name)) return 3;
+  return 4;
+}
+function buildingTabLabel(name: string): string {
+  return buildingRank(name) === 3 ? "岙底罗(万盛空间)" : name;
+}
+const orderedBuildings = computed(() => [...buildings.value].sort((a, b) =>
+  buildingRank(a.building.name) - buildingRank(b.building.name) || a.building.displayOrder - b.building.displayOrder || a.building.id - b.building.id));
 const shownBuildings = computed(() =>
-  selectedBuilding.value
-    ? buildings.value.filter((n) => n.building.id === selectedBuilding.value)
-    : buildings.value,
+  selectedBuilding.value !== null
+    ? orderedBuildings.value.filter((n) => n.building.id === selectedBuilding.value)
+    : orderedBuildings.value,
 );
 const effectiveShownRooms = computed(() => effectiveRooms(shownBuildings.value));
 const effectiveShownBeds = computed(() => effectiveBeds(effectiveShownRooms.value));
@@ -148,11 +163,18 @@ const effectiveShownBedIds = computed(() => new Set(effectiveShownBeds.value.map
 const selectedBedIds = computed(() =>
   new Set(shownBuildings.value.flatMap((n) => n.rooms.flatMap((r) => r.beds.map((b) => b.id)))),
 );
-const shownStays = computed(() =>
-  selectedBuilding.value === null
-    ? stays.value
-    : stays.value.filter((s) => selectedBedIds.value.has(s.bed.id)),
-);
+const shownStays = computed(() => {
+  const order = new Map(shownBuildings.value.flatMap((n, i) => n.rooms.flatMap(r => r.beds.map(b => [b.id, i] as const))));
+  return stays.value.filter(s => selectedBedIds.value.has(s.bed.id)).sort((a, b) => (order.get(a.bed.id) ?? 0) - (order.get(b.bed.id) ?? 0));
+});
+const shownStayAudits = computed(() => {
+  const order = new Map(shownStays.value.map((s, i) => [s.id, i]));
+  return stayAudits.value.filter(a => order.has(a.stayId)).sort((a, b) => order.get(a.stayId)! - order.get(b.stayId)!);
+});
+const shownSettlementEntries = computed(() => {
+  const order = new Map(shownBuildings.value.map((n, i) => [n.building.name, i]));
+  return settlementEntries.value.filter(e => order.has(e.buildingName)).sort((a, b) => (order.get(a.buildingName)! - order.get(b.buildingName)!));
+});
 const shownTotals = computed(() => {
   const enabledBuildings = shownBuildings.value.filter((n) => n.building.enabled);
   const rooms = effectiveShownRooms.value;
@@ -169,12 +191,6 @@ const shownTotals = computed(() => {
     free: Math.max(0, beds.length - booked - occupied),
   };
 });
-const headquartersBuildings = computed(() =>
-  buildings.value.filter((node) => !/[岙吞底罗空间]/.test(node.building.name)),
-);
-const remoteBuilding = computed(() =>
-  buildings.value.find((node) => /[岙吞底罗空间]/.test(node.building.name)) ?? buildings.value.at(-1),
-);
 const overview = computed(() => {
   const checkedIn = shownBuildings.value.filter((node) => node.building.enabled)
     .flatMap((node) => node.rooms.filter((room) => room.enabled && room.livable)).flatMap((room) => room.beds.filter((bed) => bed.enabled))
@@ -218,10 +234,10 @@ const costCutRows = computed(() => {
     .filter((row) => row.nights > 0);
 });
 const costCutNights = computed(() => costCutRows.value.reduce((sum, row) => sum + row.nights, 0));
-const capacityRows = computed(() => {
+function capacityForRooms(scopedRooms: Room[]) {
   const labels = ["单间", "标间"];
   return labels.map((label) => {
-    const rooms = effectiveShownRooms.value.filter((room) => room.roomType.includes(label));
+    const rooms = scopedRooms.filter((room) => room.roomType.includes(label));
     const row = { label, freePending: 0, freeMale: 0, freeFemale: 0, occupiedMale: 0, occupiedFemale: 0, bookedMale: 0, bookedFemale: 0 };
     for (const room of rooms) {
       const roomCounts = classifyRoomBeds(room.beds.filter((bed) => bed.enabled).map((bed) => displayStayForBed(bed.id)), today());
@@ -229,8 +245,8 @@ const capacityRows = computed(() => {
     }
     return row;
   });
-});
-const capacityTotal = computed(() => capacityRows.value.reduce((total, row) => ({
+}
+function totalCapacity(rows: ReturnType<typeof capacityForRooms>) { return rows.reduce((total, row) => ({
   label: "合计",
   freePending: total.freePending + row.freePending,
   freeMale: total.freeMale + row.freeMale,
@@ -239,7 +255,15 @@ const capacityTotal = computed(() => capacityRows.value.reduce((total, row) => (
   occupiedFemale: total.occupiedFemale + row.occupiedFemale,
   bookedMale: total.bookedMale + row.bookedMale,
   bookedFemale: total.bookedFemale + row.bookedFemale,
-}), { label: "合计", freePending: 0, freeMale: 0, freeFemale: 0, occupiedMale: 0, occupiedFemale: 0, bookedMale: 0, bookedFemale: 0 }));
+}), { label: "合计", freePending: 0, freeMale: 0, freeFemale: 0, occupiedMale: 0, occupiedFemale: 0, bookedMale: 0, bookedFemale: 0 }); }
+const buildingCapacitySummaries = computed(() => shownBuildings.value.map(node => {
+  const rooms = effectiveRooms([node]);
+  const rows = capacityForRooms(rooms);
+  const total = totalCapacity(rows);
+  const beds = effectiveBeds(rooms);
+  const occupied = beds.filter(bed => { const stay = displayStayForBed(bed.id); return stay && effectiveStayStatus(stay) === "CHECKED_IN"; }).length;
+  return { id: node.building.id, name: node.building.name, rows, total, rate: beds.length ? `${(occupied / beds.length * 100).toFixed(1)}%` : "0.0%" };
+}));
 const shownBuildingStatistics = computed(() => shownBuildings.value.filter((node) => node.building.enabled).map((node) => {
   const beds = effectiveBeds(node.rooms.filter((room) => room.enabled && room.livable));
   const active = beds.filter((bed) => Boolean(displayStayForBed(bed.id))).length;
@@ -422,13 +446,17 @@ function statIcon(icon: string): string {
   return `<svg ${svgAttrs}>${icon}</svg>`;
 }
 const historyStays = computed(() =>
-  stays.value.filter(
+  shownStays.value.filter(
     (s) => s.status === "CHECKED_OUT" || s.status === "CANCELLED",
   ),
 );
 const filteredPeople = computed(() => {
   const q = personSearch.value.trim().toLowerCase();
-  return people.value.filter(
+  const order = new Map<number, number>();
+  shownStays.value.forEach((stay, i) => { if (!order.has(stay.person.id)) order.set(stay.person.id, i); });
+  const scopedPeople = people.value.filter(p => selectedBuilding.value === null || order.has(p.id))
+    .sort((a, b) => (order.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (order.get(b.id) ?? Number.MAX_SAFE_INTEGER));
+  return scopedPeople.filter(
     (p) =>
       !q ||
       [
@@ -443,7 +471,7 @@ const filteredPeople = computed(() => {
 });
 const filteredStays = computed(() => {
   const q = ledgerSearch.value.trim().toLowerCase();
-  return stays.value.filter((s) => !q || [s.person.name, s.person.department, s.person.centerName, s.bed.bedCode, statusLabel(s.status)].some((v) => v?.toLowerCase().includes(q)));
+  return shownStays.value.filter((s) => !q || [s.person.name, s.person.department, s.person.centerName, s.bed.bedCode, statusLabel(effectiveStayStatus(s) || s.status)].some((v) => v?.toLowerCase().includes(q)));
 });
 function duplicatePerson(p: Person) {
   return people.value.some(
@@ -499,7 +527,7 @@ async function loadMeters() {
       };
   }
 }
-async function loadFees(){settlementEntries.value=await dormitoryExtensionApi.settlements(settlementAllMonths.value?'':meterMonth.value,settlementPerson.value,selectedBuilding.value)}
+async function loadFees(){settlementEntries.value=await dormitoryExtensionApi.settlements(settlementAllMonths.value?'':meterMonth.value,settlementPerson.value,null)}
 async function changeMeterMonth() {
   try {
     await Promise.all([loadMeters(),loadFees()]);
@@ -526,7 +554,7 @@ function usage(roomId: number, key: "waterEnd" | "electricEnd") {
   return Math.abs(Number(current) - Number(previous)).toFixed(2);
 }
 async function saveMeters() {
-  const rows = effectiveRooms(buildings.value).filter(
+  const rows = effectiveShownRooms.value.filter(
       (r) =>
         meterValues[r.id] &&
         (meterValues[r.id].waterStart !== "" || meterValues[r.id].waterEnd !== "" || meterValues[r.id].electricStart !== "" || meterValues[r.id].electricEnd !== ""),
@@ -1213,7 +1241,7 @@ function exportFees() {
     `员工水电分摊明细_${settlementAllMonths.value?'全部月份':meterMonth.value}`,
     "员工水电分摊明细",
     ["批次", "月份", "姓名", "部门", "楼栋", "房号", "居住天数", "计费天数", "同住人数", "分摊水量", "分摊电量", "免费电抵扣度数", "免费电抵扣金额", "应付水费", "应付电费", "总费用", "记录类型", "生成时间"],
-    settlementEntries.value.map((e) => [e.batchId,e.billingMonth,e.personName,e.department,e.buildingName,e.roomNo,e.occupiedDays,e.chargeableDays,e.occupantCount,e.waterUsage,e.electricUsage,e.freeElectricUsage,e.freeElectricAmount,e.waterAmount,e.electricAmount,e.totalAmount,e.batchStatus==='REVERSAL'?'冲正':'正常结算',localTime(e.createdAt)]),
+    shownSettlementEntries.value.map((e) => [e.batchId,e.billingMonth,e.personName,e.department,e.buildingName,e.roomNo,e.occupiedDays,e.chargeableDays,e.occupantCount,e.waterUsage,e.electricUsage,e.freeElectricUsage,e.freeElectricAmount,e.waterAmount,e.electricAmount,e.totalAmount,e.batchStatus==='REVERSAL'?'冲正':'正常结算',localTime(e.createdAt)]),
   );
 }
 async function downloadImportTemplate(kind: "people" | "resources" | "stays") {
@@ -1418,7 +1446,7 @@ function exportStatistics() {
     "宿舍统计报表",
     "楼栋统计",
     ["楼栋", "总床位", "使用中", "空床", "入住率"],
-    statistics.value.buildings.map((x) => [
+    shownBuildingStatistics.value.map((x) => [
       x.name,
       x.total,
       x.active,
@@ -1428,19 +1456,22 @@ function exportStatistics() {
   );
 }
 onMounted(load);
+onMounted(() => {
+  headerObserver = new ResizeObserver(([entry]) => { if (entry) dormHeaderHeight.value = entry.target.getBoundingClientRect().height; });
+  if (dormHeader.value) headerObserver.observe(dormHeader.value);
+});
+onBeforeUnmount(() => headerObserver?.disconnect());
 </script>
 <template>
-  <div class="dorm-system">
-    <header class="dorm-head">
+  <div class="dorm-system" :style="{ '--dorm-head-height': `${dormHeaderHeight}px` }">
+    <header ref="dormHeader" class="dorm-head">
       <div class="dorm-title"><strong>宿舍管理系统</strong><small>v8.5</small></div>
       <div class="region-tabs">
         <div class="region-primary">
           <button :class="{ active: selectedBuilding === null }" @click="selectBuilding(null)">全集团</button>
-          <button :class="{ active: !!selectedBuilding && headquartersBuildings.some((n) => n.building.id === selectedBuilding) }" @click="selectBuilding(headquartersBuildings[0]?.building.id ?? null)">总部</button>
-          <button v-if="remoteBuilding" :class="{ active: selectedBuilding === remoteBuilding.building.id }" @click="selectBuilding(remoteBuilding.building.id)">岙底罗(万盛空间)</button>
         </div>
         <div class="region-sub">
-          <button v-for="n in headquartersBuildings" :key="n.building.id" :class="{ active: selectedBuilding === n.building.id }" @click="selectBuilding(n.building.id)">{{ n.building.name }}</button>
+          <button v-for="n in orderedBuildings" :key="n.building.id" :class="{ active: selectedBuilding === n.building.id }" @click="selectBuilding(n.building.id)">{{ buildingTabLabel(n.building.name) }}</button>
         </div>
       </div>
       <div class="dorm-account"><span>当前：{{ currentUser.username || '管理员' }}</span><button type="button" @click="logoutDormitory">退出</button></div>
@@ -1471,18 +1502,18 @@ onMounted(load);
           </div>
           <h3 class="stat-section-title">统计总览 · 表格（含淡蓝合计行）</h3>
           <div class="statistics-grid">
-            <article class="stat-summary-block">
-              <h3>{{ selectedBuilding === null ? "全集团" : shownBuildings[0]?.building.name }}总览</h3>
+            <article v-for="summary in buildingCapacitySummaries" :key="summary.id" class="stat-summary-block">
+              <h3>{{ summary.name }}总览</h3>
               <div class="table-wrap">
                 <table class="capacity-table">
                   <thead><tr><th>房型</th><th>可入住待定</th><th>可入住男</th><th>可入住女</th><th>已入住男</th><th>已入住女</th><th>已预定男</th><th>已预定女</th></tr></thead>
                   <tbody>
-                    <tr v-for="row in capacityRows" :key="row.label"><td>{{ row.label }}</td><td>{{ row.freePending }}</td><td>{{ row.freeMale }}</td><td>{{ row.freeFemale }}</td><td>{{ row.occupiedMale }}</td><td>{{ row.occupiedFemale }}</td><td>{{ row.bookedMale }}</td><td>{{ row.bookedFemale }}</td></tr>
-                    <tr class="summary-total"><td>{{ capacityTotal.label }}</td><td>{{ capacityTotal.freePending }}</td><td>{{ capacityTotal.freeMale }}</td><td>{{ capacityTotal.freeFemale }}</td><td>{{ capacityTotal.occupiedMale }}</td><td>{{ capacityTotal.occupiedFemale }}</td><td>{{ capacityTotal.bookedMale }}</td><td>{{ capacityTotal.bookedFemale }}</td></tr>
+                    <tr v-for="row in summary.rows" :key="row.label"><td>{{ row.label }}</td><td>{{ row.freePending }}</td><td>{{ row.freeMale }}</td><td>{{ row.freeFemale }}</td><td>{{ row.occupiedMale }}</td><td>{{ row.occupiedFemale }}</td><td>{{ row.bookedMale }}</td><td>{{ row.bookedFemale }}</td></tr>
+                    <tr class="summary-total"><td>{{ summary.total.label }}</td><td>{{ summary.total.freePending }}</td><td>{{ summary.total.freeMale }}</td><td>{{ summary.total.freeFemale }}</td><td>{{ summary.total.occupiedMale }}</td><td>{{ summary.total.occupiedFemale }}</td><td>{{ summary.total.bookedMale }}</td><td>{{ summary.total.bookedFemale }}</td></tr>
                   </tbody>
                 </table>
               </div>
-              <p class="rate-line">入住率 <b>{{ overview.rate }}</b></p>
+              <p class="rate-line">入住率 <b>{{ summary.rate }}</b></p>
             </article>
           </div>
           <section class="cost-cut-analysis">
@@ -1897,7 +1928,7 @@ onMounted(load);
           <section class="fee-section">
             <div class="section-title"><div><h3>月底员工水电结算</h3><small>水费15元/吨；电费0.7元/度；盛心公寓每房每月免费电量10度，伏龙宿舍每房每月免费电量5度。结算记录锁定，修正须冲正后重新生成。</small></div><div class="row-actions"><button class="secondary-button" @click="exportFees">导出Excel</button><button @click="generateFees">生成本月结算</button></div></div>
             <div class="fee-rule-grid"><label>查询人员<input v-model="settlementPerson" placeholder="姓名或部门" @keyup.enter="loadFees"/></label><label class="choice"><input v-model="settlementAllMonths" type="checkbox" @change="loadFees"/> 查询全部月份</label><button class="secondary-button" @click="loadFees">查询</button></div>
-            <div class="table-wrap"><table><thead><tr><th>月份/批次</th><th>人员</th><th>楼栋/房间</th><th>居住/计费天数</th><th>水量/水费</th><th>电量/免费抵扣</th><th>应付电费</th><th>合计</th><th>类型</th><th>操作</th></tr></thead><tbody><tr v-for="e in settlementEntries" :key="e.id"><td>{{e.billingMonth}} / {{e.batchId}}</td><td>{{e.personName}}<small>{{e.department}}</small></td><td>{{e.buildingName}} / {{e.roomNo}}</td><td>{{e.occupiedDays}} / {{e.chargeableDays}}</td><td>{{e.waterUsage}} / ¥{{e.waterAmount}}</td><td>{{e.electricUsage}} / {{e.freeElectricUsage}}度（¥{{e.freeElectricAmount}}）</td><td>¥{{e.electricAmount}}</td><td><b>¥{{e.totalAmount}}</b></td><td>{{e.batchStatus==='REVERSAL'?'冲正':'正常结算'}}</td><td><button v-if="e.batchStatus==='GENERATED'" class="secondary" @click="reverseFee(e.batchId)">冲正本批次</button></td></tr><tr v-if="!settlementEntries.length"><td colspan="10" class="empty-cell">暂无结算记录。生成前需保存本月及上月水电表读数。</td></tr></tbody></table></div>
+            <div class="table-wrap"><table><thead><tr><th>月份/批次</th><th>人员</th><th>楼栋/房间</th><th>居住/计费天数</th><th>水量/水费</th><th>电量/免费抵扣</th><th>应付电费</th><th>合计</th><th>类型</th><th>操作</th></tr></thead><tbody><tr v-for="e in shownSettlementEntries" :key="e.id"><td>{{e.billingMonth}} / {{e.batchId}}</td><td>{{e.personName}}<small>{{e.department}}</small></td><td>{{e.buildingName}} / {{e.roomNo}}</td><td>{{e.occupiedDays}} / {{e.chargeableDays}}</td><td>{{e.waterUsage}} / ¥{{e.waterAmount}}</td><td>{{e.electricUsage}} / {{e.freeElectricUsage}}度（¥{{e.freeElectricAmount}}）</td><td>¥{{e.electricAmount}}</td><td><b>¥{{e.totalAmount}}</b></td><td>{{e.batchStatus==='REVERSAL'?'冲正':'正常结算'}}</td><td><button v-if="e.batchStatus==='GENERATED'" class="secondary" @click="reverseFee(e.batchId)">冲正本批次</button></td></tr><tr v-if="!shownSettlementEntries.length"><td colspan="10" class="empty-cell">暂无结算记录。生成前需保存本月及上月水电表读数。</td></tr></tbody></table></div>
           </section></template
         >
         <template v-else-if="!loading && active === 'archive'"
@@ -1949,7 +1980,7 @@ onMounted(load);
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="a in stayAudits" :key="a.id">
+                <tr v-for="a in shownStayAudits" :key="a.id">
                   <td>{{ localTime(a.operatedAt) }}</td>
                   <td>{{ a.personName }}</td>
                   <td>{{ actionLabel(a.action) }}</td>
@@ -1960,7 +1991,7 @@ onMounted(load);
                   <td>{{ a.operatorName }}</td>
                   <td>{{ a.reason || "-" }}</td>
                 </tr>
-                <tr v-if="!stayAudits.length">
+                <tr v-if="!shownStayAudits.length">
                   <td colspan="7" class="empty-cell">暂无操作轨迹</td>
                 </tr>
               </tbody>
@@ -1981,7 +2012,7 @@ onMounted(load);
             </div>
           </header>
           <div
-            v-for="node in buildings"
+            v-for="node in shownBuildings"
             :key="node.building.id"
             class="resource-setting"
           >
@@ -1989,7 +2020,7 @@ onMounted(load);
               <div>
                 <strong>{{ node.building.name }}</strong
                 ><small
-                  >{{ node.building.regionName }} ·
+                  >{{ node.building.name }} ·
                   {{ node.building.enabled ? "已启用" : "已停用" }}</small
                 >
               </div>
