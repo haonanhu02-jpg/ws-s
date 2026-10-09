@@ -311,6 +311,10 @@ function effectiveStayStatus(stay: Stay): "BOOKED" | "CHECKED_IN" | null {
 function displayStayForBed(bedId: number): Stay | undefined {
   return chooseBedStay(activeStays.value.filter((stay) => stay.bed.id === bedId), today());
 }
+function isBedBooked(bedId: number): boolean {
+  const stay = displayStayForBed(bedId);
+  return Boolean(stay && effectiveStayStatus(stay) === "BOOKED");
+}
 const stayByBed = computed(() => Object.fromEntries(
   buildings.value.flatMap((node) => node.rooms.flatMap((room) => room.beds.map((bed) => [bed.id, displayStayForBed(bed.id)])))
     .filter((entry) => entry[1] && hasVisibleOccupantName((entry[1] as Stay).person.name)),
@@ -393,7 +397,7 @@ type RoomState = "public" | "clean" | "live" | "book" | "ok";
 function roomState(room: Room): RoomState {
   if (!room.livable) return "public";
   if (room.cleaningRequired) return "clean";
-  const bedStays = room.beds.map((b) => stayByBed.value[b.id]).filter(Boolean);
+  const bedStays = room.beds.map((b) => displayStayForBed(b.id)).filter((stay): stay is Stay => Boolean(stay));
   if (bedStays.some((s) => effectiveStayStatus(s) === "CHECKED_IN")) return "live";
   if (bedStays.some((s) => effectiveStayStatus(s) === "BOOKED")) return "book";
   return "ok";
@@ -593,10 +597,8 @@ function openBed(room: Room, bed: Bed) {
     specialNote: "", remark: "",
   });
   modal.value = true;
-  const latest = activeStays.value
-    .filter((stay) => stay.bed.id === bed.id)
-    .sort((a, b) => b.plannedMoveIn.localeCompare(a.plannedMoveIn) || b.id - a.id)[0];
-  if (latest) selectReservation(latest);
+  const displayed = displayStayForBed(bed.id);
+  if (displayed) selectReservation(displayed);
   message.value = stayByBed.value[bed.id] ? "该床位已有记录，可继续录入日期不冲突的后续预订" : "";
 }
 function selectReservation(stay: Stay) {
@@ -626,6 +628,12 @@ function selectReservation(stay: Stay) {
     specialNote: stay.specialNote || "",
     remark: stay.remark || "",
   });
+}
+function editAlertStay(stay: Stay) {
+  const room = buildings.value.flatMap(node => node.rooms).find(room => room.id === stay.bed.roomId);
+  if (!room) return;
+  openBed(room, stay.bed);
+  selectReservation(stay);
 }
 function stayBody() {
   const numberOrNull = (value: string | number) => value === "" ? null : Number(value);
@@ -1234,7 +1242,7 @@ function fullStayRow(stay: Stay): (string | number | boolean | null | undefined)
 function exportFullStays() {
   const scope = selectedBuilding.value ? shownBuildings.value[0]?.building.name || "所选宿舍" : "全集团";
   return exportWorkbook(`${scope}_全部住宿历史明细台账`, "住宿历史明细", FULL_STAY_EXPORT_HEADERS,
-    shownStays.value.map((stay) => [...fullStayRow(stay), statusLabel(stay.status), localTime(stay.checkedInAt || ""), localTime(stay.checkedOutAt || "")]));
+    shownStays.value.map((stay) => [...fullStayRow(stay), statusLabel(effectiveStayStatus(stay) || stay.status), localTime(stay.checkedInAt || ""), localTime(stay.checkedOutAt || "")]));
 }
 function exportFees() {
   return exportWorkbook(
@@ -1556,18 +1564,18 @@ onBeforeUnmount(() => headerObserver?.disconnect());
                   <div class="fp-wet-area"><span>公共浴室</span><span>公共卫生间</span></div>
                   <article v-for="room in roomsInOrder(node, ['210'])" :key="room.id" :class="['fp-room', roomState(room)]">
                     <header class="fp-room-card-head"><span>{{ room.roomType }}<sup v-if="roomHasThreePieceNote(room)">*</sup></span><div><strong>{{ room.roomNo }}</strong><em v-if="roomGender(room)">{{ roomGender(room) }}</em></div></header>
-                    <div class="fp-beds"><button v-for="bed in visibleBeds(room)" :key="bed.id" :aria-label="`${room.roomNo}房床位，${occupiedByBed[bed.id]?.person.name || '空'}`" :class="{ occupied: occupiedByBed[bed.id], booked: stayByBed[bed.id]?.status === 'BOOKED', cleaning: bedNeedsCleaning(bed) }" @click="openBed(room, bed)"><template v-if="disabledBed(room, bed)"><b>{{ displayStayForBed(bed.id)?.person.name === "未填写" ? "" : displayStayForBed(bed.id)?.person.name || "" }}</b></template><template v-else-if="occupiedByBed[bed.id]"><b>{{ occupiedByBed[bed.id].person.name }}</b><small>{{ occupiedByBed[bed.id].person.centerName || "-" }}</small><small>{{ occupiedByBed[bed.id].person.department || "-" }}</small></template><b v-else-if="bedNeedsCleaning(bed)">待打扫</b><b v-else>{{ bedStatusText(bed) }}</b></button></div>
+                    <div class="fp-beds"><button v-for="bed in visibleBeds(room)" :key="bed.id" :aria-label="`${room.roomNo}房床位，${occupiedByBed[bed.id]?.person.name || '空'}`" :class="{ occupied: occupiedByBed[bed.id], booked: isBedBooked(bed.id), cleaning: bedNeedsCleaning(bed) }" @click="openBed(room, bed)"><template v-if="disabledBed(room, bed)"><b>{{ displayStayForBed(bed.id)?.person.name === "未填写" ? "" : displayStayForBed(bed.id)?.person.name || "" }}</b></template><template v-else-if="occupiedByBed[bed.id]"><b>{{ occupiedByBed[bed.id].person.name }}</b><small>{{ occupiedByBed[bed.id].person.centerName || "-" }}</small><small>{{ occupiedByBed[bed.id].person.department || "-" }}</small></template><b v-else-if="bedNeedsCleaning(bed)">待打扫</b><b v-else>{{ bedStatusText(bed) }}</b></button></div>
                   </article>
                   <div class="fp-stair"><div class="fp-stair-arrows">↑↓</div><div>楼梯</div></div>
                   <article v-for="room in roomsInOrder(node, ['209', '208', '207'])" :key="room.id" :class="['fp-room', roomState(room)]">
                     <header class="fp-room-card-head"><span>{{ room.roomType }}<sup v-if="roomHasThreePieceNote(room)">*</sup></span><div><strong>{{ room.roomNo }}</strong><em v-if="roomGender(room)">{{ roomGender(room) }}</em></div></header>
-                    <div class="fp-beds"><button v-for="bed in visibleBeds(room)" :key="bed.id" :aria-label="`${room.roomNo}房床位，${occupiedByBed[bed.id]?.person.name || '空'}`" :class="{ occupied: occupiedByBed[bed.id], booked: stayByBed[bed.id]?.status === 'BOOKED', cleaning: bedNeedsCleaning(bed) }" @click="openBed(room, bed)"><template v-if="disabledBed(room, bed)"><b>{{ displayStayForBed(bed.id)?.person.name === "未填写" ? "" : displayStayForBed(bed.id)?.person.name || "" }}</b></template><template v-else-if="occupiedByBed[bed.id]"><b>{{ occupiedByBed[bed.id].person.name }}</b><small>{{ occupiedByBed[bed.id].person.centerName || "-" }}</small><small>{{ occupiedByBed[bed.id].person.department || "-" }}</small></template><b v-else-if="bedNeedsCleaning(bed)">待打扫</b><b v-else>{{ bedStatusText(bed) }}</b></button></div>
+                    <div class="fp-beds"><button v-for="bed in visibleBeds(room)" :key="bed.id" :aria-label="`${room.roomNo}房床位，${occupiedByBed[bed.id]?.person.name || '空'}`" :class="{ occupied: occupiedByBed[bed.id], booked: isBedBooked(bed.id), cleaning: bedNeedsCleaning(bed) }" @click="openBed(room, bed)"><template v-if="disabledBed(room, bed)"><b>{{ displayStayForBed(bed.id)?.person.name === "未填写" ? "" : displayStayForBed(bed.id)?.person.name || "" }}</b></template><template v-else-if="occupiedByBed[bed.id]"><b>{{ occupiedByBed[bed.id].person.name }}</b><small>{{ occupiedByBed[bed.id].person.centerName || "-" }}</small><small>{{ occupiedByBed[bed.id].person.department || "-" }}</small></template><b v-else-if="bedNeedsCleaning(bed)">待打扫</b><b v-else>{{ bedStatusText(bed) }}</b></button></div>
                   </article>
                   <div class="fp-corridor">2楼横向过道（贯穿东西）</div>
                   <span class="fp-side-label fp-side-label-south">南侧（朝南）</span>
                   <article v-for="room in roomsInOrder(node, ['206', '205', '204', '203', '202', '201'])" :key="room.id" :class="['fp-room', roomState(room)]">
                     <header class="fp-room-card-head"><span>{{ room.roomType }}<sup v-if="roomHasThreePieceNote(room)">*</sup></span><div><strong>{{ room.roomNo }}</strong><em v-if="roomGender(room)">{{ roomGender(room) }}</em></div></header>
-                    <div class="fp-beds"><button v-for="bed in visibleBeds(room)" :key="bed.id" :aria-label="`${room.roomNo}房床位，${occupiedByBed[bed.id]?.person.name || '空'}`" :class="{ occupied: occupiedByBed[bed.id], booked: stayByBed[bed.id]?.status === 'BOOKED', cleaning: bedNeedsCleaning(bed) }" @click="openBed(room, bed)"><template v-if="disabledBed(room, bed)"><b>{{ displayStayForBed(bed.id)?.person.name === "未填写" ? "" : displayStayForBed(bed.id)?.person.name || "" }}</b></template><template v-else-if="occupiedByBed[bed.id]"><b>{{ occupiedByBed[bed.id].person.name }}</b><small>{{ occupiedByBed[bed.id].person.centerName || "-" }}</small><small>{{ occupiedByBed[bed.id].person.department || "-" }}</small></template><b v-else-if="bedNeedsCleaning(bed)">待打扫</b><b v-else>{{ bedStatusText(bed) }}</b></button></div>
+                    <div class="fp-beds"><button v-for="bed in visibleBeds(room)" :key="bed.id" :aria-label="`${room.roomNo}房床位，${occupiedByBed[bed.id]?.person.name || '空'}`" :class="{ occupied: occupiedByBed[bed.id], booked: isBedBooked(bed.id), cleaning: bedNeedsCleaning(bed) }" @click="openBed(room, bed)"><template v-if="disabledBed(room, bed)"><b>{{ displayStayForBed(bed.id)?.person.name === "未填写" ? "" : displayStayForBed(bed.id)?.person.name || "" }}</b></template><template v-else-if="occupiedByBed[bed.id]"><b>{{ occupiedByBed[bed.id].person.name }}</b><small>{{ occupiedByBed[bed.id].person.centerName || "-" }}</small><small>{{ occupiedByBed[bed.id].person.department || "-" }}</small></template><b v-else-if="bedNeedsCleaning(bed)">待打扫</b><b v-else>{{ bedStatusText(bed) }}</b></button></div>
                   </article>
                 </div>
               </div>
@@ -1578,7 +1586,7 @@ onBeforeUnmount(() => headerObserver?.disconnect());
                   <div class="fp-wet-area"><span>公共浴室</span><span>公共卫生间</span></div>
                   <article v-for="room in roomsInOrder(node, ['301'])" :key="room.id" :class="['fp-room', roomState(room)]">
                     <header class="fp-room-card-head"><span>{{ room.roomType }}<sup v-if="roomHasThreePieceNote(room)">*</sup></span><div><strong>{{ room.roomNo }}</strong><em v-if="roomGender(room)">{{ roomGender(room) }}</em></div></header>
-                    <div class="fp-beds"><button v-for="bed in visibleBeds(room)" :key="bed.id" :aria-label="`${room.roomNo}房床位，${occupiedByBed[bed.id]?.person.name || '空'}`" :class="{ occupied: occupiedByBed[bed.id], booked: stayByBed[bed.id]?.status === 'BOOKED', cleaning: bedNeedsCleaning(bed) }" @click="openBed(room, bed)"><template v-if="disabledBed(room, bed)"><b>{{ displayStayForBed(bed.id)?.person.name === "未填写" ? "" : displayStayForBed(bed.id)?.person.name || "" }}</b></template><template v-else-if="occupiedByBed[bed.id]"><b>{{ occupiedByBed[bed.id].person.name }}</b><small>{{ occupiedByBed[bed.id].person.centerName || "-" }}</small><small>{{ occupiedByBed[bed.id].person.department || "-" }}</small></template><b v-else-if="bedNeedsCleaning(bed)">待打扫</b><b v-else>{{ bedStatusText(bed) }}</b></button></div>
+                    <div class="fp-beds"><button v-for="bed in visibleBeds(room)" :key="bed.id" :aria-label="`${room.roomNo}房床位，${occupiedByBed[bed.id]?.person.name || '空'}`" :class="{ occupied: occupiedByBed[bed.id], booked: isBedBooked(bed.id), cleaning: bedNeedsCleaning(bed) }" @click="openBed(room, bed)"><template v-if="disabledBed(room, bed)"><b>{{ displayStayForBed(bed.id)?.person.name === "未填写" ? "" : displayStayForBed(bed.id)?.person.name || "" }}</b></template><template v-else-if="occupiedByBed[bed.id]"><b>{{ occupiedByBed[bed.id].person.name }}</b><small>{{ occupiedByBed[bed.id].person.centerName || "-" }}</small><small>{{ occupiedByBed[bed.id].person.department || "-" }}</small></template><b v-else-if="bedNeedsCleaning(bed)">待打扫</b><b v-else>{{ bedStatusText(bed) }}</b></button></div>
                   </article>
                   <div class="fp-stair"><div class="fp-stair-arrows">↑↓</div><div>楼梯</div></div>
                   <div class="fp-drying-area">公共晾晒区</div>
@@ -1586,7 +1594,7 @@ onBeforeUnmount(() => headerObserver?.disconnect());
                   <span class="fp-side-label fp-side-label-south">南侧（朝南）</span>
                   <article v-for="room in roomsInOrder(node, ['302', '303', '304'])" :key="room.id" :class="['fp-room', roomState(room)]">
                     <header class="fp-room-card-head"><span>{{ room.roomType }}<sup v-if="roomHasThreePieceNote(room)">*</sup></span><div><strong>{{ room.roomNo }}</strong><em v-if="roomGender(room)">{{ roomGender(room) }}</em></div></header>
-                    <div class="fp-beds"><button v-for="bed in visibleBeds(room)" :key="bed.id" :aria-label="`${room.roomNo}房床位，${occupiedByBed[bed.id]?.person.name || '空'}`" :class="{ occupied: occupiedByBed[bed.id], booked: stayByBed[bed.id]?.status === 'BOOKED', cleaning: bedNeedsCleaning(bed) }" @click="openBed(room, bed)"><template v-if="disabledBed(room, bed)"><b>{{ displayStayForBed(bed.id)?.person.name === "未填写" ? "" : displayStayForBed(bed.id)?.person.name || "" }}</b></template><template v-else-if="occupiedByBed[bed.id]"><b>{{ occupiedByBed[bed.id].person.name }}</b><small>{{ occupiedByBed[bed.id].person.centerName || "-" }}</small><small>{{ occupiedByBed[bed.id].person.department || "-" }}</small></template><b v-else-if="bedNeedsCleaning(bed)">待打扫</b><b v-else>{{ bedStatusText(bed) }}</b></button></div>
+                    <div class="fp-beds"><button v-for="bed in visibleBeds(room)" :key="bed.id" :aria-label="`${room.roomNo}房床位，${occupiedByBed[bed.id]?.person.name || '空'}`" :class="{ occupied: occupiedByBed[bed.id], booked: isBedBooked(bed.id), cleaning: bedNeedsCleaning(bed) }" @click="openBed(room, bed)"><template v-if="disabledBed(room, bed)"><b>{{ displayStayForBed(bed.id)?.person.name === "未填写" ? "" : displayStayForBed(bed.id)?.person.name || "" }}</b></template><template v-else-if="occupiedByBed[bed.id]"><b>{{ occupiedByBed[bed.id].person.name }}</b><small>{{ occupiedByBed[bed.id].person.centerName || "-" }}</small><small>{{ occupiedByBed[bed.id].person.department || "-" }}</small></template><b v-else-if="bedNeedsCleaning(bed)">待打扫</b><b v-else>{{ bedStatusText(bed) }}</b></button></div>
                   </article>
                 </div>
               </div>
@@ -1603,7 +1611,7 @@ onBeforeUnmount(() => headerObserver?.disconnect());
                   >
                     <template v-if="room.livable">
                       <header class="fp-room-card-head"><span>{{ room.roomType }}<sup v-if="roomHasThreePieceNote(room)">*</sup></span><div><strong>{{ room.roomNo }}</strong><em v-if="roomGender(room)">{{ roomGender(room) }}</em></div></header>
-                      <div class="fp-beds"><button v-for="bed in visibleBeds(room)" :key="bed.id" :aria-label="`${room.roomNo}床位，${occupiedByBed[bed.id]?.person.name || '空'}`" :class="{ occupied: occupiedByBed[bed.id], booked: stayByBed[bed.id]?.status === 'BOOKED', cleaning: bedNeedsCleaning(bed) }" @click="openBed(room, bed)"><template v-if="disabledBed(room, bed)"><b>{{ displayStayForBed(bed.id)?.person.name === "未填写" ? "" : displayStayForBed(bed.id)?.person.name || "" }}</b></template><template v-else-if="occupiedByBed[bed.id]"><b>{{ occupiedByBed[bed.id].person.name }}</b><small>{{ occupiedByBed[bed.id].person.centerName || "-" }}</small><small>{{ occupiedByBed[bed.id].person.department || "-" }}</small></template><b v-else-if="bedNeedsCleaning(bed)">待打扫</b><b v-else>{{ bedStatusText(bed) }}</b></button></div>
+                      <div class="fp-beds"><button v-for="bed in visibleBeds(room)" :key="bed.id" :aria-label="`${room.roomNo}床位，${occupiedByBed[bed.id]?.person.name || '空'}`" :class="{ occupied: occupiedByBed[bed.id], booked: isBedBooked(bed.id), cleaning: bedNeedsCleaning(bed) }" @click="openBed(room, bed)"><template v-if="disabledBed(room, bed)"><b>{{ displayStayForBed(bed.id)?.person.name === "未填写" ? "" : displayStayForBed(bed.id)?.person.name || "" }}</b></template><template v-else-if="occupiedByBed[bed.id]"><b>{{ occupiedByBed[bed.id].person.name }}</b><small>{{ occupiedByBed[bed.id].person.centerName || "-" }}</small><small>{{ occupiedByBed[bed.id].person.department || "-" }}</small></template><b v-else-if="bedNeedsCleaning(bed)">待打扫</b><b v-else>{{ bedStatusText(bed) }}</b></button></div>
                     </template>
                     <strong v-else>{{ room.roomNo }}</strong>
                   </article>
@@ -1617,12 +1625,12 @@ onBeforeUnmount(() => headerObserver?.disconnect());
                   <span class="fp-side-label fp-side-label-north">北侧：窗户朝北（溪边），从东向西</span>
                   <article v-for="room in roomsInOrder(node, ['206', '205', '204', '203', '202', '201'])" :key="room.id" :class="['fp-room', roomState(room)]">
                     <header class="fp-room-card-head"><span>{{ room.roomType }}<sup v-if="roomHasThreePieceNote(room)">*</sup></span><div><strong>{{ room.roomNo }}</strong><em v-if="roomGender(room)">{{ roomGender(room) }}</em></div></header>
-                    <div class="fp-beds"><button v-for="bed in visibleBeds(room)" :key="bed.id" :aria-label="`${room.roomNo}房床位，${occupiedByBed[bed.id]?.person.name || '空'}`" :class="{ occupied: occupiedByBed[bed.id], booked: stayByBed[bed.id]?.status === 'BOOKED', cleaning: bedNeedsCleaning(bed) }" @click="openBed(room, bed)"><template v-if="disabledBed(room, bed)"><b>{{ displayStayForBed(bed.id)?.person.name === "未填写" ? "" : displayStayForBed(bed.id)?.person.name || "" }}</b></template><template v-else-if="occupiedByBed[bed.id]"><b>{{ occupiedByBed[bed.id].person.name }}</b><small>{{ occupiedByBed[bed.id].person.centerName || "-" }}</small><small>{{ occupiedByBed[bed.id].person.department || "-" }}</small></template><b v-else-if="bedNeedsCleaning(bed)">待打扫</b><b v-else>{{ bedStatusText(bed) }}</b></button></div>
+                    <div class="fp-beds"><button v-for="bed in visibleBeds(room)" :key="bed.id" :aria-label="`${room.roomNo}房床位，${occupiedByBed[bed.id]?.person.name || '空'}`" :class="{ occupied: occupiedByBed[bed.id], booked: isBedBooked(bed.id), cleaning: bedNeedsCleaning(bed) }" @click="openBed(room, bed)"><template v-if="disabledBed(room, bed)"><b>{{ displayStayForBed(bed.id)?.person.name === "未填写" ? "" : displayStayForBed(bed.id)?.person.name || "" }}</b></template><template v-else-if="occupiedByBed[bed.id]"><b>{{ occupiedByBed[bed.id].person.name }}</b><small>{{ occupiedByBed[bed.id].person.centerName || "-" }}</small><small>{{ occupiedByBed[bed.id].person.department || "-" }}</small></template><b v-else-if="bedNeedsCleaning(bed)">待打扫</b><b v-else>{{ bedStatusText(bed) }}</b></button></div>
                   </article>
                   <span class="fp-side-label fp-side-label-east">东侧：窗户朝东（内院），从北向南（连接206）</span>
                   <article v-for="room in roomsInOrder(node, ['207', '208'])" :key="room.id" :class="['fp-room', 'fp-aodiluo-side-room', roomState(room)]">
                     <header class="fp-room-card-head"><span>{{ room.roomType }}<sup v-if="roomHasThreePieceNote(room)">*</sup></span><div><strong>{{ room.roomNo }}</strong><em v-if="roomGender(room)">{{ roomGender(room) }}</em></div></header>
-                    <div class="fp-beds"><button v-for="bed in visibleBeds(room)" :key="bed.id" :aria-label="`${room.roomNo}房床位，${occupiedByBed[bed.id]?.person.name || '空'}`" :class="{ occupied: occupiedByBed[bed.id], booked: stayByBed[bed.id]?.status === 'BOOKED', cleaning: bedNeedsCleaning(bed) }" @click="openBed(room, bed)"><template v-if="disabledBed(room, bed)"><b>{{ displayStayForBed(bed.id)?.person.name === "未填写" ? "" : displayStayForBed(bed.id)?.person.name || "" }}</b></template><template v-else-if="occupiedByBed[bed.id]"><b>{{ occupiedByBed[bed.id].person.name }}</b><small>{{ occupiedByBed[bed.id].person.centerName || "-" }}</small><small>{{ occupiedByBed[bed.id].person.department || "-" }}</small></template><b v-else-if="bedNeedsCleaning(bed)">待打扫</b><b v-else>{{ bedStatusText(bed) }}</b></button></div>
+                    <div class="fp-beds"><button v-for="bed in visibleBeds(room)" :key="bed.id" :aria-label="`${room.roomNo}房床位，${occupiedByBed[bed.id]?.person.name || '空'}`" :class="{ occupied: occupiedByBed[bed.id], booked: isBedBooked(bed.id), cleaning: bedNeedsCleaning(bed) }" @click="openBed(room, bed)"><template v-if="disabledBed(room, bed)"><b>{{ displayStayForBed(bed.id)?.person.name === "未填写" ? "" : displayStayForBed(bed.id)?.person.name || "" }}</b></template><template v-else-if="occupiedByBed[bed.id]"><b>{{ occupiedByBed[bed.id].person.name }}</b><small>{{ occupiedByBed[bed.id].person.centerName || "-" }}</small><small>{{ occupiedByBed[bed.id].person.department || "-" }}</small></template><b v-else-if="bedNeedsCleaning(bed)">待打扫</b><b v-else>{{ bedStatusText(bed) }}</b></button></div>
                   </article>
                   <div class="fp-courtyard">天井</div>
                   <div class="fp-corridor">2楼横向过道（贯穿东西）</div>
@@ -1639,7 +1647,7 @@ onBeforeUnmount(() => headerObserver?.disconnect());
                   <article v-for="room in node.rooms.filter((r) => r.floorNo === floor && r.roomType.includes('标间'))" :key="room.id" :class="['fp-room', roomState(room)]">
                     <header class="fp-room-card-head"><span>{{ room.roomType }}<sup v-if="roomHasThreePieceNote(room)">*</sup></span><div><strong>{{ room.roomNo }}</strong><em v-if="roomGender(room)">{{ roomGender(room) }}</em></div></header>
                     <div v-if="room.livable" class="fp-beds">
-                      <button v-for="bed in visibleBeds(room)" :key="bed.id" :aria-label="`${room.roomNo}房床位，${occupiedByBed[bed.id]?.person.name || '空'}`" :class="{ occupied: occupiedByBed[bed.id], booked: stayByBed[bed.id]?.status === 'BOOKED', cleaning: bedNeedsCleaning(bed) }" @click="openBed(room, bed)"><template v-if="disabledBed(room, bed)"><b>{{ displayStayForBed(bed.id)?.person.name === "未填写" ? "" : displayStayForBed(bed.id)?.person.name || "" }}</b></template><template v-else-if="occupiedByBed[bed.id]"><b>{{ occupiedByBed[bed.id].person.name }}</b><small>{{ occupiedByBed[bed.id].person.centerName || "-" }}</small><small>{{ occupiedByBed[bed.id].person.department || "-" }}</small></template><b v-else-if="bedNeedsCleaning(bed)">待打扫</b><b v-else>{{ bedStatusText(bed) }}</b></button>
+                      <button v-for="bed in visibleBeds(room)" :key="bed.id" :aria-label="`${room.roomNo}房床位，${occupiedByBed[bed.id]?.person.name || '空'}`" :class="{ occupied: occupiedByBed[bed.id], booked: isBedBooked(bed.id), cleaning: bedNeedsCleaning(bed) }" @click="openBed(room, bed)"><template v-if="disabledBed(room, bed)"><b>{{ displayStayForBed(bed.id)?.person.name === "未填写" ? "" : displayStayForBed(bed.id)?.person.name || "" }}</b></template><template v-else-if="occupiedByBed[bed.id]"><b>{{ occupiedByBed[bed.id].person.name }}</b><small>{{ occupiedByBed[bed.id].person.centerName || "-" }}</small><small>{{ occupiedByBed[bed.id].person.department || "-" }}</small></template><b v-else-if="bedNeedsCleaning(bed)">待打扫</b><b v-else>{{ bedStatusText(bed) }}</b></button>
                     </div>
                     <p v-else>公共区域</p>
                   </article>
@@ -1649,7 +1657,7 @@ onBeforeUnmount(() => headerObserver?.disconnect());
                   <article v-for="room in node.rooms.filter((r) => r.floorNo === floor && !r.roomType.includes('标间'))" :key="room.id" :class="['fp-room', roomState(room)]">
                     <header class="fp-room-card-head"><span>{{ room.roomType }}<sup v-if="roomHasThreePieceNote(room)">*</sup></span><div><strong>{{ room.roomNo }}</strong><em v-if="roomGender(room)">{{ roomGender(room) }}</em></div></header>
                     <div v-if="room.livable" class="fp-beds">
-                      <button v-for="bed in visibleBeds(room)" :key="bed.id" :aria-label="`${room.roomNo}房床位，${occupiedByBed[bed.id]?.person.name || '空'}`" :class="{ occupied: occupiedByBed[bed.id], booked: stayByBed[bed.id]?.status === 'BOOKED', cleaning: bedNeedsCleaning(bed) }" @click="openBed(room, bed)"><template v-if="disabledBed(room, bed)"><b>{{ displayStayForBed(bed.id)?.person.name === "未填写" ? "" : displayStayForBed(bed.id)?.person.name || "" }}</b></template><template v-else-if="occupiedByBed[bed.id]"><b>{{ occupiedByBed[bed.id].person.name }}</b><small>{{ occupiedByBed[bed.id].person.centerName || "-" }}</small><small>{{ occupiedByBed[bed.id].person.department || "-" }}</small></template><b v-else-if="bedNeedsCleaning(bed)">待打扫</b><b v-else>{{ bedStatusText(bed) }}</b></button>
+                      <button v-for="bed in visibleBeds(room)" :key="bed.id" :aria-label="`${room.roomNo}房床位，${occupiedByBed[bed.id]?.person.name || '空'}`" :class="{ occupied: occupiedByBed[bed.id], booked: isBedBooked(bed.id), cleaning: bedNeedsCleaning(bed) }" @click="openBed(room, bed)"><template v-if="disabledBed(room, bed)"><b>{{ displayStayForBed(bed.id)?.person.name === "未填写" ? "" : displayStayForBed(bed.id)?.person.name || "" }}</b></template><template v-else-if="occupiedByBed[bed.id]"><b>{{ occupiedByBed[bed.id].person.name }}</b><small>{{ occupiedByBed[bed.id].person.centerName || "-" }}</small><small>{{ occupiedByBed[bed.id].person.department || "-" }}</small></template><b v-else-if="bedNeedsCleaning(bed)">待打扫</b><b v-else>{{ bedStatusText(bed) }}</b></button>
                     </div>
                     <p v-else>公共区域</p>
                   </article>
@@ -1682,7 +1690,7 @@ onBeforeUnmount(() => headerObserver?.disconnect());
             </article>
             <article>
               <h3>员工入住申请单编码（{{ alerts.missingEmployeeApplication.length }}）</h3>
-              <p v-for="s in alerts.missingEmployeeApplication" :key="s.id">{{ s.person.name }} · {{ s.bed.bedCode }}</p>
+              <p v-for="s in alerts.missingEmployeeApplication" :key="s.id">{{ s.person.name }} · {{ bedDisplayName(s.bed) }} · 入住 {{ s.plannedMoveIn }} <button class="secondary" @click="editAlertStay(s)">补填编码</button></p>
               <p v-if="!alerts.missingEmployeeApplication.length" class="muted">暂无</p>
             </article>
           </div></template
@@ -1836,7 +1844,7 @@ onBeforeUnmount(() => headerObserver?.disconnect());
                 <tbody>
                   <tr v-for="s in personHistory" :key="s.id">
                     <td>{{ bedDisplayName(s.bed) }}</td>
-                    <td>{{ statusLabel(s.status) }}</td>
+                    <td>{{ statusLabel(effectiveStayStatus(s) || s.status) }}</td>
                     <td>{{ s.plannedMoveIn }}</td>
                     <td>{{ s.plannedMoveOut || "-" }}</td>
                     <td>{{ localTime(s.checkedInAt || "") }}</td>
@@ -2124,7 +2132,7 @@ onBeforeUnmount(() => headerObserver?.disconnect());
         <div v-if="selectedBedReservations.length" class="booking-schedule">
           <b>连续预订入住人</b>
           <button v-for="stay in selectedBedReservations" :key="stay.id" type="button" :class="{ active: editingStay?.id === stay.id }" @click="selectReservation(stay)">
-            <strong>{{ stay.person.name }}</strong><span>{{ stay.plannedMoveIn }} 至 {{ stay.plannedMoveOut || "未定" }}</span><small>{{ statusLabel(stay.status) }} · 点击编辑</small>
+            <strong>{{ stay.person.name }}</strong><span>{{ stay.plannedMoveIn }} 至 {{ stay.plannedMoveOut || "未定" }}</span><small>{{ statusLabel(effectiveStayStatus(stay) || stay.status) }} · 点击编辑</small>
           </button>
           <small>选择人员可编辑保存；不选择则继续新增日期不冲突的后续预订。</small>
         </div>

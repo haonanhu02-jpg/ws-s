@@ -12,8 +12,7 @@ export function hasVisibleOccupantName(name: string | null | undefined): boolean
 }
 
 export function effectiveOccupancyStatus(stay: DatedStay, businessDate: string): OccupancyStatus | null {
-  if (stay.status === "CHECKED_IN") return "CHECKED_IN";
-  if (stay.status !== "BOOKED") return null;
+  if (stay.status !== "BOOKED" && stay.status !== "CHECKED_IN") return null;
   return stay.plannedMoveIn <= businessDate ? "CHECKED_IN" : "BOOKED";
 }
 

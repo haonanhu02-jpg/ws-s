@@ -18,6 +18,16 @@ describe("dormitory occupancy presentation", () => {
     expect(effectiveOccupancyStatus({ status: "BOOKED", plannedMoveIn: "2026-09-16" }, businessDate)).toBe("BOOKED");
   });
 
+  it("uses future move-in dates even when the saved state is CHECKED_IN", () => {
+    expect(effectiveOccupancyStatus({ status: "CHECKED_IN", plannedMoveIn: "2026-10-19" }, "2026-10-09")).toBe("BOOKED");
+  });
+
+  it("preserves terminal states and counts today's move-in as occupied", () => {
+    for (const status of ["CANCELLED", "CHECKED_OUT"] as const)
+      expect(effectiveOccupancyStatus({ status, plannedMoveIn: "2026-09-01" }, businessDate)).toBeNull();
+    expect(effectiveOccupancyStatus({ status: "CHECKED_IN", plannedMoveIn: businessDate }, businessDate)).toBe("CHECKED_IN");
+  });
+
   it("uses the current dated stay instead of a later consecutive reservation", () => {
     const current = { id: 1, status: "BOOKED" as const, plannedMoveIn: "2026-09-13", plannedMoveOut: "2026-09-15" };
     const future = { id: 2, status: "BOOKED" as const, plannedMoveIn: "2026-09-16" };
