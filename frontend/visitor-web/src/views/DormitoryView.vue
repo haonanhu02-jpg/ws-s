@@ -304,7 +304,12 @@ function selectBuilding(id: number | null) {
 const activeStays = computed(() =>
   stays.value.filter((s) => s.status === "BOOKED" || s.status === "CHECKED_IN"),
 );
-const today = () => { const now = new Date(); return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`; };
+function localDate(): string { const now = new Date(); return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`; }
+// Make the date reactive: computed colours/alerts must not stay cached overnight.
+const businessDate = ref(localDate());
+const today = () => businessDate.value;
+const refreshBusinessDate = () => { businessDate.value = localDate(); };
+let businessDateTimer: ReturnType<typeof setInterval> | undefined;
 function effectiveStayStatus(stay: Stay): "BOOKED" | "CHECKED_IN" | null {
   return effectiveOccupancyStatus(stay, today());
 }
@@ -1465,10 +1470,18 @@ function exportStatistics() {
 }
 onMounted(load);
 onMounted(() => {
+  businessDateTimer = setInterval(refreshBusinessDate, 30_000);
+  window.addEventListener("focus", refreshBusinessDate);
+  document.addEventListener("visibilitychange", refreshBusinessDate);
   headerObserver = new ResizeObserver(([entry]) => { if (entry) dormHeaderHeight.value = entry.target.getBoundingClientRect().height; });
   if (dormHeader.value) headerObserver.observe(dormHeader.value);
 });
-onBeforeUnmount(() => headerObserver?.disconnect());
+onBeforeUnmount(() => {
+  headerObserver?.disconnect();
+  if (businessDateTimer !== undefined) clearInterval(businessDateTimer);
+  window.removeEventListener("focus", refreshBusinessDate);
+  document.removeEventListener("visibilitychange", refreshBusinessDate);
+});
 </script>
 <template>
   <div class="dorm-system" :style="{ '--dorm-head-height': `${dormHeaderHeight}px` }">
@@ -2131,7 +2144,7 @@ onBeforeUnmount(() => headerObserver?.disconnect());
         <button v-if="selectedBed?.cleaningRequired" type="button" class="secondary-button cleaning-finish" @click="finishBedCleaning">完成打扫</button>
         <div v-if="selectedBedReservations.length" class="booking-schedule">
           <b>连续预订入住人</b>
-          <button v-for="stay in selectedBedReservations" :key="stay.id" type="button" :class="{ active: editingStay?.id === stay.id }" @click="selectReservation(stay)">
+          <button v-for="stay in selectedBedReservations" :key="stay.id" type="button" :class="{ active: editingStay?.id === stay.id, booked: effectiveStayStatus(stay) === 'BOOKED', occupied: effectiveStayStatus(stay) === 'CHECKED_IN' }" @click="selectReservation(stay)">
             <strong>{{ stay.person.name }}</strong><span>{{ stay.plannedMoveIn }} 至 {{ stay.plannedMoveOut || "未定" }}</span><small>{{ statusLabel(effectiveStayStatus(stay) || stay.status) }} · 点击编辑</small>
           </button>
           <small>选择人员可编辑保存；不选择则继续新增日期不冲突的后续预订。</small>

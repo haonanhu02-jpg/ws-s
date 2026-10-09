@@ -1099,6 +1099,23 @@ tbody tr:hover { background: var(--d86-brand-soft); }
 }
 
 /* Final shell rules: navigation follows scrolling below the measured header. */
+/* Selection highlights the border; it must never replace the stay's status colour. */
+.dormitory-layout .booking-schedule button.booked{background:#fff8e1;border-color:#ffe082;color:#b26a00}
+.dormitory-layout .booking-schedule button.occupied{background:#dbeafe;border-color:#bbdefb;color:#1565c0}
+.dormitory-layout .booking-schedule button.active{outline:2px solid var(--d86-primary);outline-offset:1px}
+.dormitory-layout .booking-schedule button.booked span,.dormitory-layout .booking-schedule button.booked small{color:#b26a00}
+.dormitory-layout .booking-schedule button.occupied span,.dormitory-layout .booking-schedule button.occupied small{color:#1565c0}
+
+/* A close control stays inside its dialog but outside the scrolling content flow. */
+.modal-card>.drawer-close,.record-dialog>.drawer-close,.detail-drawer>.drawer-close,
+.dormitory-layout .modal-card>.drawer-close{
+  position:sticky;top:12px;right:14px;z-index:5;display:block;
+  justify-self:end;align-self:start;width:44px;min-width:44px;height:44px;min-height:44px;
+  margin:0 14px -44px auto;padding:0;border:1px solid #dbe1ea;border-radius:50%;
+  background:#fff;color:#50605b;box-shadow:0 2px 6px rgba(16,24,40,.12);font-size:28px;line-height:1;
+}
+.dormitory-layout .modal-card>h3{padding-right:72px}
+.record-dialog>h2,.detail-drawer>h2{padding-right:58px}
 .dormitory-layout .dorm-head{position:sticky;top:0;z-index:12}
 .dormitory-layout .dorm-nav{position:fixed;top:var(--dorm-head-height,56px);left:0;bottom:auto;margin:0;width:176px;height:calc(100dvh - var(--dorm-head-height,56px));min-height:0;overflow-y:auto;z-index:11}
 .dormitory-layout .dorm-content{grid-column:2}
