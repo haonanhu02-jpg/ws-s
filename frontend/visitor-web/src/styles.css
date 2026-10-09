@@ -1102,6 +1102,38 @@ tbody tr:hover { background: var(--d86-brand-soft); }
 /* Selection highlights the border; it must never replace the stay's status colour. */
 .dormitory-layout .cleaning-explanation{margin:0 20px 16px;padding:12px;color:#9e2a23;background:#fcebea;border-radius:7px}
 .dormitory-layout .fp-beds button.unavailable{background:#f1f5f9!important;border-color:#cbd5e1!important;color:#64748b!important}
+
+/* Scoped report controls: labels stack above fields; buttons never stretch with grids. */
+.dormitory-layout .cost-cut-analysis{padding:20px;border:1px solid var(--d86-line);border-radius:8px;background:var(--d86-surface);margin-top:20px}
+.dormitory-layout .cost-cut-analysis>.section-title{display:flex;flex-wrap:wrap;align-items:flex-end;gap:16px;margin-bottom:16px}
+.dormitory-layout .cost-cut-analysis>.section-title>div:first-child{flex:1 1 240px;min-width:0}
+.dormitory-layout .cost-cut-analysis h3{margin:0 0 6px;font-size:18px}
+.dormitory-layout .cost-cut-analysis small{display:block;line-height:1.6;color:var(--d86-text-2);font-size:12px}
+.dormitory-layout .cost-cut-analysis .row-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;flex:1 1 520px;max-width:680px;min-width:0;white-space:normal;overflow:visible}
+.dormitory-layout .cost-cut-analysis .row-actions label{display:grid;gap:6px;min-width:0;font-size:13px;color:var(--d86-text-2)}
+.dormitory-layout .cost-cut-analysis .row-actions input,.dormitory-layout .cost-cut-analysis .row-actions select{width:100%;min-width:0;height:40px;margin:0;padding:8px 10px;font-size:14px}
+.dormitory-layout .cost-cut-analysis>button{width:auto;height:40px;margin:0 0 16px;padding:0 16px}
+.dormitory-layout .fee-section{padding:20px}
+.dormitory-layout .fee-section>.section-title{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;align-items:start;margin-bottom:16px}
+.dormitory-layout .fee-section .section-title h3{margin:0 0 8px;font-size:18px}
+.dormitory-layout .fee-section .section-title small{display:block;max-width:740px;line-height:1.6;font-size:12px;color:var(--d86-text-2)}
+.dormitory-layout .fee-section .row-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px;overflow:visible;width:auto}
+.dormitory-layout .fee-section .section-title button,.dormitory-layout .fee-section .fee-rule-grid>button{width:auto;min-height:40px;height:40px;margin:0;padding:0 16px;white-space:nowrap;align-self:end;justify-self:start}
+.dormitory-layout .fee-section .fee-rule-grid{grid-template-columns:minmax(180px,300px) auto auto;justify-content:start;align-items:end;gap:12px 20px;padding:12px;margin:0 0 16px}
+.dormitory-layout .fee-section .fee-rule-grid label{min-width:0;gap:6px}
+.dormitory-layout .fee-section .fee-rule-grid input:not([type=checkbox]){min-width:0;width:100%;height:40px;padding:8px 10px;margin:0}
+.dormitory-layout .fee-section .fee-rule-grid .choice{height:40px;margin:0;white-space:nowrap}
+.dormitory-layout .fee-section .fee-rule-grid .choice input{width:16px;height:16px;margin:0;flex:none}
+.dormitory-layout .fee-section .empty-cell{padding:24px 16px;line-height:1.6}
+@media(max-width:760px){
+ .dormitory-layout .cost-cut-analysis,.dormitory-layout .fee-section{padding:16px}
+ .dormitory-layout .cost-cut-analysis>.section-title{align-items:stretch}
+ .dormitory-layout .cost-cut-analysis>.section-title>div:first-child{flex:auto}
+ .dormitory-layout .cost-cut-analysis .row-actions{flex:auto;max-width:none;grid-template-columns:1fr;width:100%}
+ .dormitory-layout .fee-section>.section-title{grid-template-columns:1fr}
+ .dormitory-layout .fee-section .fee-rule-grid{grid-template-columns:1fr;gap:10px}
+ .dormitory-layout .fee-section .row-actions{width:auto}
+}
 .dormitory-layout .booking-schedule button.booked{background:#fff8e1;border-color:#ffe082;color:#b26a00}
 .dormitory-layout .booking-schedule button.occupied{background:#dbeafe;border-color:#bbdefb;color:#1565c0}
 .dormitory-layout .booking-schedule button.active{outline:2px solid var(--d86-primary);outline-offset:1px}
