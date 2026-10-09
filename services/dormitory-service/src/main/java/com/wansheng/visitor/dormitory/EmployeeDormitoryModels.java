@@ -34,6 +34,7 @@ final class EmployeeDormitoryModels {
  record RoomCommand(@NotNull Long buildingId,@NotBlank String roomNo,@NotNull Integer floorNo,String facing,@NotBlank String roomType,Boolean livable,Boolean cleaningRequired,Integer gridCol,Integer gridRow,Integer gridColSpan,Integer gridRowSpan,Integer displayOrder,String specialNote,Boolean enabled) {}
  record BedCommand(@NotNull Long roomId,@NotBlank String label,@NotBlank String bedCode,String threePiece,Boolean enabled) {}
  record CleaningCommand(@NotNull Boolean required) {}
+ record PrepareCleaningCommand(Long stayId,@PositiveOrZero Long stayVersion,@NotNull LocalDate businessDate) {}
  record PersonCommand(String name,String centerName,String department,@Pattern(regexp="男|女") String gender,String category,String positionName,String rankName) {}
  record ResourceImportCommand(@NotBlank String buildingName,@NotBlank String regionName,@NotBlank String roomNo,@NotNull Integer floorNo,String facing,@NotBlank String roomType,@NotBlank String bedLabel,@NotBlank String bedCode,String threePiece) {}
  record BookCommand(@NotNull Long personId,@NotNull Long bedId,String applicationCode,String liaison,String bedType,String threePiece,String threePieceNote,Boolean costCut,Boolean promiseSigned,Boolean cleaningRequired,@PositiveOrZero BigDecimal moveInWater,@PositiveOrZero BigDecimal moveInElectric,@PositiveOrZero BigDecimal moveOutWater,@PositiveOrZero BigDecimal moveOutElectric,LocalDate plannedMoveIn,LocalDate plannedMoveOut,String specialNote,String remark) {}

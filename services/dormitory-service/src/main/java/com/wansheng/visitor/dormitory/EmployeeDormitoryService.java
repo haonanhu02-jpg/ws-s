@@ -79,6 +79,19 @@ class EmployeeDormitoryService {
  @Transactional Stay cancel(long id,String op){Stay s=stay(id);if(repo.transition(id,"BOOKED","CANCELLED",op)!=1)throw conflict("只有已预订记录可以取消");repo.audit(id,"CANCEL",s.bed().id(),null,"BOOKED","CANCELLED",op,null);return stay(id);}
  @Transactional void deleteTerminalStay(long id,String op){Stay s=stay(id);if(s.status()!=StayStatus.CANCELLED&&s.status()!=StayStatus.CHECKED_OUT)throw conflict("只有已取消或已退宿记录可以删除");repo.resourceAudit("STAY",id,"DELETE",s.toString(),null,op);repo.deleteStayAudits(id);found(repo.deleteStay(id));}
 
+ @Transactional Bed prepareCleaning(long bedId,PrepareCleaningCommand c,String op){
+  repo.bed(bedId).orElseThrow(()->bad("床位不存在"));repo.lockBed(bedId);
+  if(c.stayId()!=null){
+   Stay selected=stay(c.stayId());
+   if(selected.bed().id()!=bedId)throw conflict("住宿记录不属于所选床位，请刷新后重试");
+   if(c.stayVersion()==null||selected.version()!=c.stayVersion())throw conflict("住宿记录已变动，请刷新后重试");
+   if(selected.status()!=StayStatus.BOOKED&&selected.status()!=StayStatus.CHECKED_IN)throw conflict("住宿记录已经结束，请刷新后重试");
+   String to=selected.plannedMoveIn().isAfter(c.businessDate())?"CANCELLED":"CHECKED_OUT";
+   if(repo.finishForCleaning(selected.id(),selected.status().name(),to,selected.version(),op)!=1)throw conflict("住宿记录已变动，请刷新后重试");
+   repo.audit(selected.id(),"CHECKED_OUT".equals(to)?"CHECK_OUT":"CANCEL",bedId,null,selected.status().name(),to,op,"标记待打扫，仅结束所选住宿");
+  }
+  return setBedCleaning(bedId,new CleaningCommand(true),op);
+ }
  private void ensureAvailable(long bedId,String gender,long except,java.time.LocalDate plannedMoveIn,java.time.LocalDate plannedMoveOut){enabledBed(bedId);repo.lockBed(bedId);if(repo.occupied(bedId,except,plannedMoveIn,plannedMoveOut))throw conflict("该床位在所选入住日期内存在冲突");if(repo.mixedGender(bedId,gender,except,plannedMoveIn,plannedMoveOut))throw conflict("所选日期内标间禁止男女混住");}
  private Building enabledBuilding(long id){Building b=repo.building(id).orElseThrow(()->bad("楼栋不存在"));if(!b.enabled())throw conflict("楼栋已停用");return b;}
  private Room enabledRoom(long id){Room r=repo.room(id).orElseThrow(()->bad("房间不存在"));if(!r.enabled()||!r.livable())throw conflict("房间不可入住或已停用");return r;}

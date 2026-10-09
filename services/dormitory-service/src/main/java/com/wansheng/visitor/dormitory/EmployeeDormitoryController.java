@@ -24,6 +24,7 @@ class EmployeeDormitoryController {
  @PostMapping("/beds") Bed addBed(@Valid @RequestBody BedCommand c,Principal p){return service.addBed(c,p.getName());}
  @PutMapping("/beds/{id}") Bed updateBed(@PathVariable long id,@Valid @RequestBody BedCommand c,Principal p){return service.updateBed(id,c,p.getName());}
  @PostMapping("/beds/{id}/cleaning") Bed setBedCleaning(@PathVariable long id,@Valid @RequestBody CleaningCommand c,Principal p){return service.setBedCleaning(id,c,p.getName());}
+ @PostMapping("/beds/{id}/prepare-cleaning") Bed prepareCleaning(@PathVariable long id,@Valid @RequestBody PrepareCleaningCommand c,Principal p){return service.prepareCleaning(id,c,p.getName());}
  @GetMapping("/resource-audits") List<ResourceAudit> resourceAudits(){return service.resourceAudits();}
  @GetMapping("/stay-audits") List<StayAudit> stayAudits(){return service.stayAudits();}
  @GetMapping("/meter-readings") List<MeterReading> meterReadings(@RequestParam String month){return service.meterReadings(month);}

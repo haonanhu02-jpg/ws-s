@@ -14,9 +14,20 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'C:/Users/12778/.c
       const roomNo = ['317', '210', '主卧', '206'][i];
       return { building: { id, name, enabled: true, displayOrder: i }, rooms: [{ id, buildingId: id, roomNo, floorNo: i === 0 ? 3 : 2, facing: '南', roomType: '单间', enabled: true, livable: true, cleaningRequired: false, beds: [{ id, roomId: id, label: '单床', bedCode: `${name}-${roomNo}`, enabled: true, cleaningRequired: false }] }] };
     });
-    const stays = buildings.map((node, i) => ({ id: i + 1, bed: node.rooms[0].beds[0], person: { id: i + 1, name: `预订人员${i + 1}`, department: '法务部', gender: '男', category: '' }, status: i % 2 ? 'BOOKED' : 'CHECKED_IN', plannedMoveIn: '2026-10-19', costCut: false }));
+    const stays = buildings.map((node, i) => ({ id: i + 1, version: 0, bed: node.rooms[0].beds[0], person: { id: i + 1, name: `预订人员${i + 1}`, centerName: '法务中心', department: '法务部', gender: '男', category: '己审批长住员工' }, bedType: '长住房', status: i % 2 ? 'BOOKED' : 'CHECKED_IN', plannedMoveIn: '2026-10-19', plannedMoveOut: '2026-10-20', costCut: false }));
+    const next = { ...stays[0], id: 5, plannedMoveIn: '2026-10-21', plannedMoveOut: undefined, person: { ...stays[0].person, name: '后续预订' } };
+    stays.push(next);
+    const writes = [];
     await page.route('**/api/visitor/**', async route => {
       const path = new URL(route.request().url()).pathname;
+      if (route.request().method() !== 'GET') {
+        writes.push({ path, body: route.request().postDataJSON() });
+        if (path.endsWith('/prepare-cleaning')) {
+          const command = route.request().postDataJSON();
+          stays.find(s => s.id === command.stayId).status = 'CHECKED_OUT';
+          buildings[0].rooms[0].beds[0].cleaningRequired = true;
+        }
+      }
       const body = path.endsWith('/resources/tree') ? { buildings } : path.endsWith('/stays') ? stays : path.endsWith('/people') ? stays.map(s => s.person) : path.endsWith('/statistics') ? { summary: {}, buildings: [], categories: [], statuses: [] } : [];
       await route.fulfill({ json: body });
     });
@@ -31,6 +42,8 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'C:/Users/12778/.c
       await bed.waitFor();
       check(await bed.evaluate(el => el.classList.contains('booked') && !el.classList.contains('occupied')), `${node.building.name}: future bed must be booked`);
       check(await bed.evaluate(el => getComputedStyle(el).backgroundColor === 'rgb(255, 248, 225)'), `${node.building.name}: future bed must visibly be yellow`);
+      const text = await bed.innerText();
+      check(text.includes(`预订人员${node.building.id}`) && text.includes('法务中心') && text.includes('法务部') && !text.includes('已预订'), `${node.building.name}: booked bed must show resident details instead of status text`);
       await bed.click();
       const reservation = page.locator('.booking-schedule button').first();
       check((await reservation.innerText()).includes('已预定'), `${node.building.name}: future editor must say booked`);
@@ -55,8 +68,24 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'C:/Users/12778/.c
     const beds = page.locator('.fp-beds button');
     for (let i = 0; i < await beds.count(); i++) check(await beds.nth(i).evaluate(el => el.classList.contains('occupied') && !el.classList.contains('booked')), 'cross-midnight map must update without reload');
     await beds.first().click();
-    check((await page.locator('.booking-schedule button').first().innerText()).includes('已入住'), 'cross-midnight editor must match map');
-    check(await page.locator('.booking-schedule button').first().evaluate(el => getComputedStyle(el).backgroundColor === 'rgb(219, 234, 254)'), 'occupied editor card must be blue');
+    check((await page.locator('.booking-schedule button.active').innerText()).includes('已入住'), 'cross-midnight editor must match map');
+    check(await page.locator('.booking-schedule button.active').evaluate(el => getComputedStyle(el).backgroundColor === 'rgb(219, 234, 254)'), 'occupied editor card must be blue');
+    const cleaning = page.locator('.booking-grid label').filter({ hasText: '是否待打扫' }).locator('select');
+    await cleaning.selectOption({ label: '是' });
+    check(await page.locator('.booking-grid label').filter({ hasText: /^姓名/ }).locator('input').inputValue() === '', 'cleaning selection must immediately clear form');
+    await cleaning.selectOption({ label: '否' });
+    check(await page.locator('.booking-grid label').filter({ hasText: /^姓名/ }).locator('input').inputValue() === '预订人员1', 'undo cleaning must restore original form');
+    await cleaning.selectOption({ label: '是' });
+    await page.getByRole('button', { name: '保存待打扫', exact: true }).click();
+    check(writes.length === 1 && writes[0].path.endsWith('/beds/1/prepare-cleaning') && writes[0].body.stayId === 1, 'cleaning must use one scoped atomic request, never overwrite resident details');
+    check(next.status === 'CHECKED_IN' && next.plannedMoveIn === '2026-10-21' && next.person.name === '后续预订', 'later booking must stay untouched');
+    await page.locator('.dorm-nav button').filter({ hasText: '预警看板' }).click();
+    const warning = page.locator('.warning-columns article').filter({ hasText: '员工入住申请单编码' });
+    check(!(await warning.innerText()).includes('预订人员3') && !(await warning.innerText()).includes('预订人员4'), 'Huacheng/Aodiluo must not warn for missing codes');
+    check((await warning.innerText()).includes('预订人员2'), 'Fulong must retain due missing-code warnings');
+    await page.locator('.dorm-nav button').filter({ hasText: '可视化平面图' }).click();
+    await page.locator('.fp-beds button').first().click();
+    check(await page.locator('.booking-grid label').filter({ hasText: /^姓名/ }).locator('input').inputValue() === '', 'cleaning bed must reopen blank without selecting next booking');
     // Resource dialogs share the same close-button rule, including mobile scrolling.
     await page.locator('.dorm-booking .drawer-close').click();
     await page.locator('.dorm-nav button').filter({ hasText: '设置' }).click();

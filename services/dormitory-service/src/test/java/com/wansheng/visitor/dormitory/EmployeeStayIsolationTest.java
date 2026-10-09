@@ -2,6 +2,7 @@ package com.wansheng.visitor.dormitory;
 
 import static com.wansheng.visitor.dormitory.EmployeeDormitoryModels.*;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.time.LocalDate;
 import org.flywaydb.core.Flyway;
 import org.h2.jdbcx.JdbcDataSource;
@@ -33,6 +34,37 @@ class EmployeeStayIsolationTest {
   return service.book(new BookCommand(person,bed,null,null,"长住房",null,null,false,null,false,null,null,null,null,IN,null,null,null),"test");
  }
  private UpdateStayCommand details(String name){return new UpdateStayCommand(name,"新中心","新部门","男","己审批长住员工","新岗位","新职级","APP-309",null,"长住房",null,null,false,null,false,null,null,null,null,IN,null,null,null);}
+ @ParameterizedTest @ValueSource(strings={"盛心公寓","伏龙宿舍","花城宿舍","岙底罗"})
+ void preparingCleaningEndsOnlySelectedStayAndPreservesHistory(String name){
+  long building=repo.addBuilding(new BuildingCommand(name+"清洁测试","测试",true,0));
+  Stay current=book(room309.person().id(),building,"201");
+  service.extend(current.id(),new ExtendCommand(IN.plusDays(10),null),"test");
+  current=service.stay(current.id());
+  Stay next=service.book(new BookCommand(current.person().id(),current.bed().id(),"NEXT",null,"长住房",null,null,false,null,false,null,null,null,null,IN.plusDays(11),null,null,null),"test");
+  Bed bed=service.prepareCleaning(current.bed().id(),new PrepareCleaningCommand(current.id(),current.version(),IN.plusDays(5)),"cleaner");
+  Stay ended=service.stay(current.id());
+  assertThat(bed.cleaningRequired()).isTrue();assertThat(ended.status()).isEqualTo(StayStatus.CHECKED_OUT);
+  assertThat(ended.person()).isEqualTo(current.person());assertThat(ended.checkedOutAt()).isNotNull();
+  assertThat(service.stay(next.id())).usingRecursiveComparison().ignoringFields("bed.cleaningRequired").isEqualTo(next);assertThat(service.stay(room313.id())).isEqualTo(room313);
+  assertThat(service.stayAudits().stream().filter(a->a.stayId().equals(ended.id())).map(StayAudit::action)).contains("CHECK_OUT");
+ }
+ @Test void futureSavedAsCheckedInIsCancelledForCleaning(){
+  Stay future=service.checkIn(room309.id(),"test");
+  service.prepareCleaning(future.bed().id(),new PrepareCleaningCommand(future.id(),future.version(),IN.minusDays(1)),"test");
+  assertThat(service.stay(future.id()).status()).isEqualTo(StayStatus.CANCELLED);
+  assertThat(service.stay(future.id()).person()).isEqualTo(future.person());
+ }
+ @Test void cleaningRejectsWrongBedAndStaleVersionsBeforeWriting(){
+  assertThatThrownBy(()->service.prepareCleaning(room309.bed().id(),new PrepareCleaningCommand(room313.id(),room313.version(),IN),"test")).isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+  assertThatThrownBy(()->service.prepareCleaning(room309.bed().id(),new PrepareCleaningCommand(room309.id(),room309.version()+1,IN),"test")).isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+  assertThat(repo.bed(room309.bed().id()).orElseThrow().cleaningRequired()).isFalse();
+  assertThat(service.stay(room309.id())).isEqualTo(room309);
+ }
+ @Test void emptyCleaningRequestDoesNotCancelAnyReservation(){
+  service.prepareCleaning(room309.bed().id(),new PrepareCleaningCommand(null,null,IN),"test");
+  assertThat(service.stay(room309.id())).usingRecursiveComparison().ignoringFields("bed.cleaningRequired").isEqualTo(room309);
+  assertThat(repo.bed(room309.bed().id()).orElseThrow().cleaningRequired()).isTrue();
+ }
  @Test void clearing313AndReentering309DoesNotCopyAcrossRooms(){
   service.updateStay(room313.id(),details(""),"test");
   assertThat(service.stay(room309.id()).person().name()).isEqualTo("欧阳春");

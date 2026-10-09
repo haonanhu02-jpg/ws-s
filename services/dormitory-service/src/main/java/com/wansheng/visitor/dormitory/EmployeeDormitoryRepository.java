@@ -33,6 +33,7 @@ class EmployeeDormitoryRepository {
  long addBed(BedCommand c){return insert("INSERT INTO dorm_bed(room_id,label,bed_code,three_piece,enabled) VALUES(?,?,?,?,?)",c.roomId(),c.label(),c.bedCode(),c.threePiece(),value(c.enabled(),true));}
  int updateBed(long id,BedCommand c){return jdbc.update("UPDATE dorm_bed SET room_id=?,label=?,bed_code=?,three_piece=?,enabled=?,version=version+1 WHERE id=?",c.roomId(),c.label(),c.bedCode(),c.threePiece(),value(c.enabled(),true),id);}
  int setBedCleaning(long id,boolean required){return jdbc.update("UPDATE dorm_bed SET cleaning_required=?,version=version+1 WHERE id=?",required,id);}
+ int finishForCleaning(long id,String from,String to,long version,String op){String stamp="CHECKED_OUT".equals(to)?",checked_out_at=CURRENT_TIMESTAMP":"";return jdbc.update("UPDATE dorm_stay SET status=?,operator_name=?,updated_at=CURRENT_TIMESTAMP,version=version+1"+stamp+" WHERE id=? AND status=? AND version=?",to,op,id,from,version);}
  int activeOnBed(long id){return count("SELECT COUNT(*) FROM dorm_stay WHERE bed_id=? AND status IN ('BOOKED','CHECKED_IN')",id);}
  int activeInRoom(long id){return count("SELECT COUNT(*) FROM dorm_stay s JOIN dorm_bed b ON b.id=s.bed_id WHERE b.room_id=? AND s.status IN ('BOOKED','CHECKED_IN')",id);}
  int activeInBuilding(long id){return count("SELECT COUNT(*) FROM dorm_stay s JOIN dorm_bed b ON b.id=s.bed_id JOIN dorm_room r ON r.id=b.room_id WHERE r.building_id=? AND s.status IN ('BOOKED','CHECKED_IN')",id);}
