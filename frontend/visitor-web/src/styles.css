@@ -1101,6 +1101,7 @@ tbody tr:hover { background: var(--d86-brand-soft); }
 /* Final shell rules: navigation follows scrolling below the measured header. */
 /* Selection highlights the border; it must never replace the stay's status colour. */
 .dormitory-layout .cleaning-explanation{margin:0 20px 16px;padding:12px;color:#9e2a23;background:#fcebea;border-radius:7px}
+.dormitory-layout .fp-beds button.unavailable{background:#f1f5f9!important;border-color:#cbd5e1!important;color:#64748b!important}
 .dormitory-layout .booking-schedule button.booked{background:#fff8e1;border-color:#ffe082;color:#b26a00}
 .dormitory-layout .booking-schedule button.occupied{background:#dbeafe;border-color:#bbdefb;color:#1565c0}
 .dormitory-layout .booking-schedule button.active{outline:2px solid var(--d86-primary);outline-offset:1px}

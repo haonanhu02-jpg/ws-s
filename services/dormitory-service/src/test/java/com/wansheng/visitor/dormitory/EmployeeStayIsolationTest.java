@@ -123,6 +123,26 @@ class EmployeeStayIsolationTest {
   assertThat(service.stay(room313.id())).isEqualTo(history);
   assertThat(service.personStays(room309.person().id()).stream().filter(s -> !s.id().equals(room309.id()) && !s.id().equals(room313.id())).findFirst().orElseThrow().person().centerName()).isEqualTo("独立中心");
  }
+ @ParameterizedTest @ValueSource(strings={"盛心公寓","伏龙宿舍","花城宿舍","岙底罗"})
+ void importedStayCanBeEditedAndQueriedWithModifiedDetails(String name){
+  long building=repo.addBuilding(new BuildingCommand(name+"导入编辑","测试",true,0));
+  long room=repo.addRoom(new RoomCommand(building,"101",1,"南","单间",true,false,null,null,null,null,0,null,true));
+  String code=name+"导入编辑-101";
+  repo.addBed(new BedCommand(room,"单床",code,null,true));
+  StayImportCommand row=new StayImportCommand("导入姓名","导入中心","导入部门",null,null,null,null,name+"导入编辑","101",code,null,null,null,null,null,false,null,false,null,null,null,null,IN,null,null,null,"CHECKED_IN");
+  assertThat(service.importStays(java.util.List.of(row),"test").staysCreated()).isEqualTo(1);
+  Stay imported=service.stays(null,building,null).get(0);
+  UpdateStayCommand command=new UpdateStayCommand("修改姓名","修改中心","修改部门",null,"己审批长住员工","修改岗位","T6","UPDATED",null,"长住房",null,null,false,true,false,null,null,null,null,IN,null,null,"修改备注");
+  try(var validator=jakarta.validation.Validation.buildDefaultValidatorFactory()){
+   assertThat(validator.getValidator().validate(command)).isEmpty();
+  }
+  service.updateStay(imported.id(),command,"editor");
+  Stay reloaded=service.stays(null,building,"修改姓名").get(0);
+  assertThat(reloaded.person()).extracting(Person::name,Person::centerName,Person::department,Person::positionName,Person::rankName).containsExactly("修改姓名","修改中心","修改部门","修改岗位","T6");
+  assertThat(reloaded.applicationCode()).isEqualTo("UPDATED");assertThat(reloaded.remark()).isEqualTo("修改备注");
+  assertThat(reloaded.id()).isEqualTo(imported.id());assertThat(reloaded.version()).isEqualTo(imported.version()+1);
+  assertThat(service.stay(room309.id())).isEqualTo(room309);
+ }
  @Test void migrationBackfillsSharedRecordsWithoutChangingIdentityOrDates(){
   JdbcDataSource ds=new JdbcDataSource();ds.setURL("jdbc:h2:mem:stay_upgrade;MODE=PostgreSQL;DB_CLOSE_DELAY=-1");
   Flyway.configure().dataSource(ds).cleanDisabled(false).load().clean();
