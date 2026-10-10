@@ -86,7 +86,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'C:/Users/12778/.c
       assert.equal(green, 6, `${n.building.name}: six available green beds`);
       await page.locator('.dorm-nav button').filter({ hasText: '统计总览' }).click();
       const cells = await page.locator('.stat-summary-block .summary-total td').allTextContents();
-      assert.deepEqual(cells, ['合计','4','1','1','1','1','1','0'], `${n.building.name}: pending, male, female and occupied counts follow map`);
+      assert.deepEqual(cells, ['合计','4','1','1','1','1','1','0','9'], `${n.building.name}: pending, male, female and occupied counts follow map`);
       assert.equal(cells.slice(1,4).reduce((sum,c) => sum + Number(c),0), green);
       const download = page.waitForEvent('download');
       await page.getByRole('button', { name: '导出统计总览', exact: true }).click();
