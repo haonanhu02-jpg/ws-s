@@ -159,6 +159,7 @@ const shownBuildings = computed(() =>
     : orderedBuildings.value,
 );
 const effectiveShownRooms = computed(() => effectiveRooms(shownBuildings.value));
+const adaptFloorplanLegend = computed(() => shownBuildings.value.some(node => buildingRank(node.building.name) !== 0));
 const effectiveShownBeds = computed(() => effectiveBeds(effectiveShownRooms.value));
 const effectiveShownBedIds = computed(() => new Set(effectiveShownBeds.value.map((bed) => bed.id)));
 const selectedBedIds = computed(() =>
@@ -405,7 +406,8 @@ const alerts = computed(() => ({
 }));
 type RoomState = "unavailable" | "public" | "clean" | "live" | "book" | "ok";
 function roomState(room: Room): RoomState {
-  if (!room.enabled || !buildings.value.find(node => node.building.id === room.buildingId)?.building.enabled) return "unavailable";
+  const building = buildings.value.find(node => node.building.id === room.buildingId)?.building;
+  if (!room.enabled || !building?.enabled) return building && buildingRank(building.name) === 0 ? "public" : "unavailable";
   if (!room.livable) return "public";
   if (room.cleaningRequired) return "clean";
   const bedStays = room.beds.filter(b => b.enabled && !b.cleaningRequired).map((b) => displayStayForBed(b.id));
@@ -1607,14 +1609,14 @@ onBeforeUnmount(() => {
               </svg>
               <div class="fp-compass-text"
                 ><b>上北下南 · 左西右东</b
-                ><small>颜色块代表床位状态 · 点击床位可办理</small></div
+                ><small>颜色块代表{{ adaptFloorplanLegend ? '床位' : '房间' }}状态 · 点击床位可办理</small></div
               >
             </div>
-            <div class="fp-legend">
-              <span>图例</span><i class="fp-sw ok"></i>可入住<i class="fp-sw book"></i>已预订<i class="fp-sw live"></i>已入住<i class="fp-sw clean"></i>待打扫<i class="fp-sw public"></i>公共区域<i class="fp-sw unavailable"></i>停用
+            <div class="fp-legend" :class="{ 'fp-adapted': adaptFloorplanLegend }">
+              <span>图例</span><i class="fp-sw ok"></i>可入住<i class="fp-sw book"></i>已预订<i class="fp-sw live"></i>已入住<i class="fp-sw clean"></i>待打扫<i class="fp-sw public"></i>公共区域<template v-if="adaptFloorplanLegend"><i class="fp-sw unavailable"></i>停用</template>
             </div>
           </div>
-          <div v-for="node in shownBuildings" :key="node.building.id" class="fp-building">
+          <div v-for="node in shownBuildings" :key="node.building.id" class="fp-building" :class="{ 'fp-adapted': buildingRank(node.building.name) !== 0 }">
             <header class="fp-building-head"><h3>{{ node.building.name }}<small>{{ node.building.regionName }}</small></h3></header>
             <template v-if="isFulong(node)">
               <div class="fp-floor fp-fulong-floor">

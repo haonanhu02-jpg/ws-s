@@ -37,6 +37,16 @@ const {chromium} = require(process.env.PLAYWRIGHT_MODULE || 'C:/Users/12778/.cac
   const sheet=workbook.worksheets[0],headers=sheet.getRow(1).values;assert.equal(headers.at(-1),'总计');
   for(let r=2;r<=sheet.rowCount;r++)assert.equal(sheet.getRow(r).getCell(sheet.columnCount).value,sheet.getRow(r).getCell(2).value==='标间'?0:3);
   await page.locator('.dorm-nav button').filter({hasText:'可视化平面图'}).click();
+  await page.locator('.region-tabs button').filter({hasText:'盛心公寓'}).click();
+  const originalRoom=no=>page.locator('.fp-room').filter({has:page.locator('header strong',{hasText:no})});
+  assert.equal(await page.locator('.fp-sw.live').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(227, 242, 253)','Shengxin legend remains unchanged');
+  assert.equal(await page.locator('.fp-sw.clean').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(216, 58, 58)','Shengxin cleaning legend remains unchanged');
+  assert.equal(await page.locator('.fp-sw.unavailable').count(),0,'Shengxin original legend has no additional state');
+  assert.equal(await originalRoom('209').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(243, 229, 245)','Shengxin original disabled-room presentation remains unchanged');
+  assert.equal(await originalRoom('210').locator('.fp-beds button').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(219, 234, 254)');
+  await page.locator('.region-tabs button').filter({hasText:'全集团'}).click();
+  assert.deepEqual(await page.locator('.fp-building').evaluateAll(elements=>elements.map(el=>el.classList.contains('fp-adapted'))),[false,true,true,true],'Only the other three dormitories receive adapted styles');
+  assert.equal(await page.locator('.fp-building').first().locator('.fp-room').filter({has:page.locator('header strong',{hasText:'209'})}).evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(243, 229, 245)','Group view also preserves Shengxin');
   await page.locator('.region-tabs button').filter({hasText:'伏龙宿舍'}).click();
   assert.match(await page.locator('.fp-legend').innerText(),/停用/);
   const colour=locator=>locator.evaluate(el=>getComputedStyle(el).backgroundColor);
@@ -51,6 +61,6 @@ const {chromium} = require(process.env.PLAYWRIGHT_MODULE || 'C:/Users/12778/.cac
   assert.equal(await colour(page.locator('.fp-stair').first()),await legend('public'));
   assert.equal(await colour(page.locator('.fp-drying-area').first()),await legend('public'));
   if(process.env.QA_OUTPUT_DIR)await page.screenshot({path:process.env.QA_OUTPUT_DIR+'/fulong.png',fullPage:true});
-  console.log('Four-dormitory row/column totals and Excel export; Fulong legend matches occupied/booked/free/clean/public/disabled colours');
+  console.log('Shengxin original styles preserved in single/group views; four-dormitory totals/export retained; other dormitories receive scoped palette');
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

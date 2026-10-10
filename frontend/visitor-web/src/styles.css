@@ -1160,7 +1160,7 @@ tbody tr:hover { background: var(--d86-brand-soft); }
   .dormitory-layout .dorm-nav{position:sticky;top:var(--dorm-head-height,56px);width:100%;height:auto;min-height:0;flex-direction:row;overflow-x:auto;overflow-y:hidden}
 }
 
-/* One palette for all dormitories: legend, bed strips and non-residential areas. */
+/* Adapt other dormitories to Shengxin bed colours without overriding Shengxin. */
 .dormitory-layout {
   --fp-free: #e8f5e9; --fp-free-line: #c8e6c9;
   --fp-booked: #fff8e1; --fp-booked-line: #ffe082;
@@ -1169,31 +1169,31 @@ tbody tr:hover { background: var(--d86-brand-soft); }
   --fp-public: #f3e5f5; --fp-public-line: #e1bee7;
   --fp-unavailable: #f1f5f9; --fp-unavailable-line: #cbd5e1;
 }
-.dormitory-layout .fp-sw.ok { background: var(--fp-free); border-color: var(--fp-free-line); }
-.dormitory-layout .fp-sw.book { background: var(--fp-booked); border-color: var(--fp-booked-line); }
-.dormitory-layout .fp-sw.live { background: var(--fp-occupied); border-color: var(--fp-occupied-line); }
-.dormitory-layout .fp-sw.clean { background: var(--fp-cleaning); border-color: var(--fp-cleaning-line); }
-.dormitory-layout .fp-sw.public { background: var(--fp-public); border-color: var(--fp-public-line); }
-.dormitory-layout .fp-sw.unavailable { background: var(--fp-unavailable); border-color: var(--fp-unavailable-line); }
-.dormitory-layout .fp-beds button:not(.occupied):not(.booked):not(.cleaning) { background: var(--fp-free); }
-.dormitory-layout .fp-beds button.booked:not(.occupied):not(.cleaning) { background: var(--fp-booked); }
-.dormitory-layout .fp-beds button.occupied:not(.cleaning) { background: var(--fp-occupied); }
-.dormitory-layout .fp-beds button.cleaning { background: var(--fp-cleaning) !important; border-color: var(--fp-cleaning-line) !important; }
-.dormitory-layout .fp-stair,
-.dormitory-layout .fp-wet-area,
-.dormitory-layout .fp-drying-area,
-.dormitory-layout .fp-fulong-board-3f .fp-drying-area,
-.dormitory-layout .fp-room.public,
-.dormitory-layout .fp-home-room.public { background: var(--fp-public); border-color: var(--fp-public-line); color: #6a1b9a; }
-.dormitory-layout .fp-wet-area span + span { border-left-color: var(--fp-public-line); }
-.dormitory-layout .fp-beds button.public-area:not(.unavailable) { background: var(--fp-public) !important; color: #6a1b9a !important; }
-.dormitory-layout .fp-room.unavailable,
-.dormitory-layout .fp-home-room.unavailable,
-.dormitory-layout .fp-beds button.unavailable { background: var(--fp-unavailable) !important; border-color: var(--fp-unavailable-line) !important; color: #64748b !important; }
-.dormitory-layout .fp-room.unavailable header strong,
-.dormitory-layout .fp-home-room.unavailable header strong { color: #64748b; }
-.dormitory-layout .fp-room.clean header strong,
-.dormitory-layout .fp-home-room.clean header strong { color: #b91c1c; }
+.dormitory-layout :is(.fp-building.fp-adapted, .fp-legend.fp-adapted) .fp-sw.ok { background: var(--fp-free); border-color: var(--fp-free-line); }
+.dormitory-layout :is(.fp-building.fp-adapted, .fp-legend.fp-adapted) .fp-sw.book { background: var(--fp-booked); border-color: var(--fp-booked-line); }
+.dormitory-layout :is(.fp-building.fp-adapted, .fp-legend.fp-adapted) .fp-sw.live { background: var(--fp-occupied); border-color: var(--fp-occupied-line); }
+.dormitory-layout :is(.fp-building.fp-adapted, .fp-legend.fp-adapted) .fp-sw.clean { background: var(--fp-cleaning); border-color: var(--fp-cleaning-line); }
+.dormitory-layout :is(.fp-building.fp-adapted, .fp-legend.fp-adapted) .fp-sw.public { background: var(--fp-public); border-color: var(--fp-public-line); }
+.dormitory-layout :is(.fp-building.fp-adapted, .fp-legend.fp-adapted) .fp-sw.unavailable { background: var(--fp-unavailable); border-color: var(--fp-unavailable-line); }
+.dormitory-layout :is(.fp-building.fp-adapted, .fp-legend.fp-adapted) .fp-beds button:not(.occupied):not(.booked):not(.cleaning) { background: var(--fp-free); }
+.dormitory-layout :is(.fp-building.fp-adapted, .fp-legend.fp-adapted) .fp-beds button.booked:not(.occupied):not(.cleaning) { background: var(--fp-booked); }
+.dormitory-layout :is(.fp-building.fp-adapted, .fp-legend.fp-adapted) .fp-beds button.occupied:not(.cleaning) { background: var(--fp-occupied); }
+.dormitory-layout :is(.fp-building.fp-adapted, .fp-legend.fp-adapted) .fp-beds button.cleaning { background: var(--fp-cleaning) !important; border-color: var(--fp-cleaning-line) !important; }
+.dormitory-layout :is(.fp-building.fp-adapted, .fp-legend.fp-adapted) .fp-stair,
+.dormitory-layout :is(.fp-building.fp-adapted, .fp-legend.fp-adapted) .fp-wet-area,
+.dormitory-layout :is(.fp-building.fp-adapted, .fp-legend.fp-adapted) .fp-drying-area,
+.dormitory-layout :is(.fp-building.fp-adapted, .fp-legend.fp-adapted) .fp-fulong-board-3f .fp-drying-area,
+.dormitory-layout :is(.fp-building.fp-adapted, .fp-legend.fp-adapted) .fp-room.public,
+.dormitory-layout :is(.fp-building.fp-adapted, .fp-legend.fp-adapted) .fp-home-room.public { background: var(--fp-public); border-color: var(--fp-public-line); color: #6a1b9a; }
+.dormitory-layout :is(.fp-building.fp-adapted, .fp-legend.fp-adapted) .fp-wet-area span + span { border-left-color: var(--fp-public-line); }
+.dormitory-layout :is(.fp-building.fp-adapted, .fp-legend.fp-adapted) .fp-beds button.public-area:not(.unavailable) { background: var(--fp-public) !important; color: #6a1b9a !important; }
+.dormitory-layout :is(.fp-building.fp-adapted, .fp-legend.fp-adapted) .fp-room.unavailable,
+.dormitory-layout :is(.fp-building.fp-adapted, .fp-legend.fp-adapted) .fp-home-room.unavailable,
+.dormitory-layout :is(.fp-building.fp-adapted, .fp-legend.fp-adapted) .fp-beds button.unavailable { background: var(--fp-unavailable) !important; border-color: var(--fp-unavailable-line) !important; color: #64748b !important; }
+.dormitory-layout :is(.fp-building.fp-adapted, .fp-legend.fp-adapted) .fp-room.unavailable header strong,
+.dormitory-layout :is(.fp-building.fp-adapted, .fp-legend.fp-adapted) .fp-home-room.unavailable header strong { color: #64748b; }
+.dormitory-layout :is(.fp-building.fp-adapted, .fp-legend.fp-adapted) .fp-room.clean header strong,
+.dormitory-layout :is(.fp-building.fp-adapted, .fp-legend.fp-adapted) .fp-home-room.clean header strong { color: #b91c1c; }
 .dormitory-layout .capacity-table .capacity-row-total { position: sticky; right: 0; min-width: 72px; font-weight: 700; color: var(--d86-brand); background: var(--d86-surface); border-left: 1px solid var(--d86-line); }
 .dormitory-layout .capacity-table th.capacity-row-total { background: #f1f5f9; }
 .dormitory-layout .capacity-table .summary-total .capacity-row-total { background: var(--d86-brand-soft-2); }
