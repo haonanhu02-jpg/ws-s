@@ -2,7 +2,7 @@ export type OccupancyStatus = "BOOKED" | "CHECKED_IN";
 
 export interface DatedStay {
   status: "BOOKED" | "CHECKED_IN" | "CHECKED_OUT" | "CANCELLED";
-  plannedMoveIn: string;
+  plannedMoveIn: string | null;
   plannedMoveOut?: string;
 }
 
@@ -18,6 +18,7 @@ export function editableGender(value: string | null | undefined): "" | "男" | "
 
 export function effectiveOccupancyStatus(stay: DatedStay, businessDate: string): OccupancyStatus | null {
   if (stay.status !== "BOOKED" && stay.status !== "CHECKED_IN") return null;
+  if (!stay.plannedMoveIn) return stay.status;
   return stay.plannedMoveIn <= businessDate ? "CHECKED_IN" : "BOOKED";
 }
 
@@ -26,7 +27,7 @@ export function chooseBedStay<T extends DatedStay>(stays: T[], businessDate: str
     const aStatus = effectiveOccupancyStatus(a, businessDate);
     const bStatus = effectiveOccupancyStatus(b, businessDate);
     if (aStatus !== bStatus) return aStatus === "CHECKED_IN" ? -1 : 1;
-    return a.plannedMoveIn.localeCompare(b.plannedMoveIn);
+    return (a.plannedMoveIn || "").localeCompare(b.plannedMoveIn || "");
   })[0];
 }
 

@@ -27,7 +27,7 @@ final class EmployeeDormitoryModels {
  record FeeSettlementResult(FeeSettlementBatch batch,List<FeeSettlementEntry> entries) {}
  record BuildingNode(Building building,List<Room> rooms) {}
  record Person(Long id,String name,String centerName,String department,String gender,String category,String positionName,String rankName) {}
- record Stay(Long id,Person person,Bed bed,StayStatus status,String applicationCode,String liaison,String bedType,String threePiece,String threePieceNote,boolean costCut,Boolean promiseSigned,boolean cleaningRequired,BigDecimal moveInWater,BigDecimal moveInElectric,BigDecimal moveOutWater,BigDecimal moveOutElectric,LocalDate plannedMoveIn,LocalDate plannedMoveOut,Instant checkedInAt,Instant checkedOutAt,String specialNote,String remark,long version) {}
+ record Stay(Long id,Person person,Bed bed,StayStatus status,String applicationCode,String liaison,String bedType,String threePiece,String threePieceNote,Boolean costCut,Boolean promiseSigned,Boolean cleaningRequired,BigDecimal moveInWater,BigDecimal moveInElectric,BigDecimal moveOutWater,BigDecimal moveOutElectric,LocalDate plannedMoveIn,LocalDate plannedMoveOut,Instant checkedInAt,Instant checkedOutAt,String specialNote,String remark,long version) {}
  record StayImportSummary(int received,int staysCreated,int staysUpdated,int peopleCreated,List<String> skipped) {}
 
  record BuildingCommand(@NotBlank String name,@NotBlank String regionName,Boolean enabled,Integer displayOrder) {}

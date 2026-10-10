@@ -69,7 +69,7 @@ class EmployeeStayIsolationTest {
   service.updateStay(room313.id(),details(""),"test");
   assertThat(service.stay(room309.id()).person().name()).isEqualTo("欧阳春");
   service.updateStay(room309.id(),details("重新录入"),"test");
-  assertThat(service.stay(room313.id()).person().name()).isEqualTo("未填写");
+  assertThat(service.stay(room313.id()).person().name()).isEmpty();
   assertThat(service.stay(room309.id()).person().name()).isEqualTo("重新录入");
   assertThat(service.stay(room309.id()).person().id()).isEqualTo(room309.person().id());
   assertThat(extension.occupantNames(room309.bed().roomId(),IN,IN.plusMonths(1))).containsExactly("重新录入");

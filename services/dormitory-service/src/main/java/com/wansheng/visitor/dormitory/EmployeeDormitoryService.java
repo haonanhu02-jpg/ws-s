@@ -42,22 +42,22 @@ class EmployeeDormitoryService {
     Building building=repo.building(room.buildingId()).orElseThrow(()->bad("床位所属楼栋不存在"));
     if(!blank(c.buildingName())&&!building.name().equals(c.buildingName().trim()))throw bad("楼栋名称与床位编码不匹配");
     if(!blank(c.roomNo())&&!room.roomNo().equals(c.roomNo().trim()))throw bad("房号与床位编码不匹配");
-    String name=blank(c.name())?"未填写":c.name().trim();
-    String department=blank(c.department())?"未填写":c.department().trim();
-    String gender=blank(c.gender())?"未填写":c.gender().trim();
+    String name=blank(c.name())?"":c.name().trim();
+    String department=blank(c.department())?"":c.department().trim();
+    String gender=blank(c.gender())?"":c.gender().trim();
     String category=normalizeCategory(c.category());
-    String bedType=blank(c.bedType())?room.roomType():c.bedType().trim();
-    LocalDate plannedMoveIn=c.plannedMoveIn()==null?LocalDate.now(ZoneId.of("Asia/Shanghai")):c.plannedMoveIn();
+    String bedType=blank(c.bedType())?"":c.bedType().trim();
+    LocalDate plannedMoveIn=c.plannedMoveIn();
     Optional<Stay> existing=repo.activeStayForImport(bed.id(),name,department,plannedMoveIn,c.plannedMoveOut());
     if(existing.isPresent()){
-     Stay updated=updateStay(existing.get().id(),new UpdateStayCommand(name,c.centerName(),department,gender,category,c.positionName(),c.rankName(),c.applicationCode(),c.liaison(),bedType,c.threePiece(),c.threePieceNote(),Boolean.TRUE.equals(c.costCut()),c.promiseSigned(),c.cleaningRequired(),c.moveInWater(),c.moveInElectric(),c.moveOutWater(),c.moveOutElectric(),plannedMoveIn,c.plannedMoveOut(),c.specialNote(),c.remark()),op);
+     Stay updated=updateStay(existing.get().id(),new UpdateStayCommand(name,c.centerName(),department,gender,category,c.positionName(),c.rankName(),c.applicationCode(),c.liaison(),bedType,c.threePiece(),c.threePieceNote(),c.costCut(),c.promiseSigned(),c.cleaningRequired(),c.moveInWater(),c.moveInElectric(),c.moveOutWater(),c.moveOutElectric(),plannedMoveIn,c.plannedMoveOut(),c.specialNote(),c.remark()),op);
      if(updated.status()==StayStatus.BOOKED&&shouldCheckIn(c.importedStatus(),plannedMoveIn))checkIn(updated.id(),op);
      staysUpdated++;
      continue;
     }
     Person person=repo.person(name,department).orElse(null);
     if(person==null){long personId=repo.addPerson(new PersonCommand(name,c.centerName(),department,gender,category,c.positionName(),c.rankName()));person=repo.person(personId).orElseThrow();peopleCreated++;}
-    Stay created=book(new BookCommand(person.id(),bed.id(),c.applicationCode(),c.liaison(),bedType,c.threePiece(),c.threePieceNote(),Boolean.TRUE.equals(c.costCut()),c.promiseSigned(),c.cleaningRequired(),c.moveInWater(),c.moveInElectric(),c.moveOutWater(),c.moveOutElectric(),plannedMoveIn,c.plannedMoveOut(),c.specialNote(),c.remark()),op,gender);
+    Stay created=book(new BookCommand(person.id(),bed.id(),c.applicationCode(),c.liaison(),bedType,c.threePiece(),c.threePieceNote(),c.costCut(),c.promiseSigned(),c.cleaningRequired(),c.moveInWater(),c.moveInElectric(),c.moveOutWater(),c.moveOutElectric(),plannedMoveIn,c.plannedMoveOut(),c.specialNote(),c.remark()),op,gender);
     repo.snapshotResident(created.id(),new PersonCommand(name,c.centerName(),department,gender,category,c.positionName(),c.rankName()));
     if(shouldCheckIn(c.importedStatus(),plannedMoveIn))checkIn(created.id(),op);
     staysCreated++;
@@ -74,7 +74,7 @@ class EmployeeDormitoryService {
  @Transactional Stay updateStay(long id,UpdateStayCommand c,String op){Stay s=stay(id);UpdateStayCommand safe=stayDefaults(c);validateDates(safe.plannedMoveIn(),safe.plannedMoveOut());if(editableBedIsEnabled(s.bed()))ensureAvailable(s.bed().id(),safe.gender(),id,safe.plannedMoveIn(),safe.plannedMoveOut());if(repo.updateStay(id,safe,op)!=1)throw conflict("只有预订或入住中的记录可以编辑");found(repo.snapshotResident(id,personDefaults(new PersonCommand(safe.name(),safe.centerName(),safe.department(),safe.gender(),safe.category(),safe.positionName(),safe.rankName()))));repo.setBedCleaning(s.bed().id(),Boolean.TRUE.equals(safe.cleaningRequired()));repo.audit(id,"UPDATE",s.bed().id(),s.bed().id(),s.status().name(),s.status().name(),op,"编辑入住信息");return stay(id);}
  @Transactional Stay checkIn(long id,String op){Stay s=stay(id);repo.lockBed(s.bed().id());if(repo.checkedInByAnotherStay(s.bed().id(),id))throw conflict("床位仍有未退宿人员，暂不能入住");if(repo.transition(id,"BOOKED","CHECKED_IN",op)!=1)throw conflict("只有已预订记录可以入住");repo.audit(id,"CHECK_IN",s.bed().id(),s.bed().id(),"BOOKED","CHECKED_IN",op,null);return stay(id);}
  @Transactional Stay transfer(long id,TransferCommand c,String op){Stay s=stay(id);enabledBed(c.bedId());ensureAvailable(c.bedId(),s.person().gender(),id,s.plannedMoveIn(),s.plannedMoveOut());if(repo.transfer(id,c.bedId(),op)!=1)throw conflict("只有预订或入住中的记录可以调宿");repo.audit(id,"TRANSFER",s.bed().id(),c.bedId(),s.status().name(),s.status().name(),op,c.reason());return stay(id);}
- @Transactional Stay extend(long id,ExtendCommand c,String op){Stay s=stay(id);if(c.plannedMoveOut().isBefore(s.plannedMoveIn()))throw bad("计划退宿日期不得早于入住日期");ensureAvailable(s.bed().id(),s.person().gender(),id,s.plannedMoveIn(),c.plannedMoveOut());if(repo.extend(id,c.plannedMoveOut(),op)!=1)throw conflict("只有预订或入住中的记录可以续住");repo.audit(id,"EXTEND",s.bed().id(),s.bed().id(),s.status().name(),s.status().name(),op,c.reason());return stay(id);}
+ @Transactional Stay extend(long id,ExtendCommand c,String op){Stay s=stay(id);if(s.plannedMoveIn()!=null&&c.plannedMoveOut().isBefore(s.plannedMoveIn()))throw bad("计划退宿日期不得早于入住日期");ensureAvailable(s.bed().id(),s.person().gender(),id,s.plannedMoveIn(),c.plannedMoveOut());if(repo.extend(id,c.plannedMoveOut(),op)!=1)throw conflict("只有预订或入住中的记录可以续住");repo.audit(id,"EXTEND",s.bed().id(),s.bed().id(),s.status().name(),s.status().name(),op,c.reason());return stay(id);}
  @Transactional Stay checkout(long id,CheckoutCommand c,String op){Stay s=stay(id);if(repo.checkout(id,c,op)!=1)throw conflict("只有已入住记录可以退宿");repo.audit(id,"CHECK_OUT",s.bed().id(),null,"CHECKED_IN","CHECKED_OUT",op,c.reason());return stay(id);}
  @Transactional Stay cancel(long id,String op){Stay s=stay(id);if(repo.transition(id,"BOOKED","CANCELLED",op)!=1)throw conflict("只有已预订记录可以取消");repo.audit(id,"CANCEL",s.bed().id(),null,"BOOKED","CANCELLED",op,null);return stay(id);}
  @Transactional void deleteTerminalStay(long id,String op){Stay s=stay(id);if(s.status()!=StayStatus.CANCELLED&&s.status()!=StayStatus.CHECKED_OUT)throw conflict("只有已取消或已退宿记录可以删除");repo.resourceAudit("STAY",id,"DELETE",s.toString(),null,op);repo.deleteStayAudits(id);found(repo.deleteStay(id));}
@@ -86,7 +86,7 @@ class EmployeeDormitoryService {
    if(selected.bed().id()!=bedId)throw conflict("住宿记录不属于所选床位，请刷新后重试");
    if(c.stayVersion()==null||selected.version()!=c.stayVersion())throw conflict("住宿记录已变动，请刷新后重试");
    if(selected.status()!=StayStatus.BOOKED&&selected.status()!=StayStatus.CHECKED_IN)throw conflict("住宿记录已经结束，请刷新后重试");
-   String to=selected.plannedMoveIn().isAfter(c.businessDate())?"CANCELLED":"CHECKED_OUT";
+   String to=(selected.plannedMoveIn()==null?selected.status()==StayStatus.BOOKED:selected.plannedMoveIn().isAfter(c.businessDate()))?"CANCELLED":"CHECKED_OUT";
    if(repo.finishForCleaning(selected.id(),selected.status().name(),to,selected.version(),op)!=1)throw conflict("住宿记录已变动，请刷新后重试");
    repo.audit(selected.id(),"CHECKED_OUT".equals(to)?"CHECK_OUT":"CANCEL",bedId,null,selected.status().name(),to,op,"标记待打扫，仅结束所选住宿");
   }
@@ -97,13 +97,13 @@ class EmployeeDormitoryService {
  private Room enabledRoom(long id){Room r=repo.room(id).orElseThrow(()->bad("房间不存在"));if(!r.enabled()||!r.livable())throw conflict("房间不可入住或已停用");return r;}
  private boolean editableBedIsEnabled(Bed bed){Room room=repo.room(bed.roomId()).orElseThrow();return bed.enabled()&&room.enabled()&&room.livable()&&repo.building(room.buildingId()).orElseThrow().enabled();}
  private Bed enabledBed(long id){Bed b=repo.bed(id).orElseThrow(()->bad("床位不存在"));enabledRoom(b.roomId());if(!b.enabled())throw conflict("床位已停用");return b;}
- private static void validateDates(java.time.LocalDate in,java.time.LocalDate out){if(out!=null&&out.isBefore(in))throw bad("计划退宿日期不得早于入住日期");}
+ private static void validateDates(java.time.LocalDate in,java.time.LocalDate out){if(in!=null&&out!=null&&out.isBefore(in))throw bad("计划退宿日期不得早于入住日期");}
  private static boolean blank(String value){return value==null||value.isBlank();}
- private static String normalizeCategory(String value){if(blank(value))return "未分类";String normalized=value.trim().replace('（','(').replace('）',')');return switch(normalized){case "已审批长住人","已审批长住人员","已审批长住员工"->"己审批长住员工";default->normalized;};}
- private static boolean shouldCheckIn(String importedStatus,LocalDate plannedMoveIn){String status=blank(importedStatus)?"":importedStatus.trim().toUpperCase(Locale.ROOT);return status.equals("已入住")||status.equals("CHECKED_IN")||!plannedMoveIn.isAfter(LocalDate.now(ZoneId.of("Asia/Shanghai")));}
- private static PersonCommand personDefaults(PersonCommand c){return new PersonCommand(blank(c.name())?"未填写":c.name().trim(),c.centerName(),blank(c.department())?"未填写":c.department().trim(),blank(c.gender())?"未填写":c.gender().trim(),blank(c.category())?"未分类":c.category().trim(),c.positionName(),c.rankName());}
- private static BookCommand bookDefaults(BookCommand c){return new BookCommand(c.personId(),c.bedId(),c.applicationCode(),c.liaison(),blank(c.bedType())?"未填写":c.bedType().trim(),c.threePiece(),c.threePieceNote(),Boolean.TRUE.equals(c.costCut()),c.promiseSigned(),Boolean.TRUE.equals(c.cleaningRequired()),c.moveInWater(),c.moveInElectric(),c.moveOutWater(),c.moveOutElectric(),c.plannedMoveIn()==null?LocalDate.now(ZoneId.of("Asia/Shanghai")):c.plannedMoveIn(),c.plannedMoveOut(),c.specialNote(),c.remark());}
- private static UpdateStayCommand stayDefaults(UpdateStayCommand c){return new UpdateStayCommand(blank(c.name())?"未填写":c.name().trim(),c.centerName(),blank(c.department())?"未填写":c.department().trim(),blank(c.gender())?"未填写":c.gender().trim(),blank(c.category())?"未分类":c.category().trim(),c.positionName(),c.rankName(),c.applicationCode(),c.liaison(),blank(c.bedType())?"未填写":c.bedType().trim(),c.threePiece(),c.threePieceNote(),Boolean.TRUE.equals(c.costCut()),c.promiseSigned(),Boolean.TRUE.equals(c.cleaningRequired()),c.moveInWater(),c.moveInElectric(),c.moveOutWater(),c.moveOutElectric(),c.plannedMoveIn()==null?LocalDate.now(ZoneId.of("Asia/Shanghai")):c.plannedMoveIn(),c.plannedMoveOut(),c.specialNote(),c.remark());}
+ private static String normalizeCategory(String value){if(blank(value))return "";String normalized=value.trim().replace('（','(').replace('）',')');return switch(normalized){case "已审批长住人","已审批长住人员","已审批长住员工"->"己审批长住员工";default->normalized;};}
+ private static boolean shouldCheckIn(String importedStatus,LocalDate plannedMoveIn){String status=blank(importedStatus)?"":importedStatus.trim().toUpperCase(Locale.ROOT);return status.equals("已入住")||status.equals("CHECKED_IN")||(plannedMoveIn!=null&&!plannedMoveIn.isAfter(LocalDate.now(ZoneId.of("Asia/Shanghai"))));}
+ private static PersonCommand personDefaults(PersonCommand c){return new PersonCommand(blank(c.name())?"":c.name().trim(),c.centerName(),blank(c.department())?"":c.department().trim(),blank(c.gender())?"":c.gender().trim(),blank(c.category())?"":c.category().trim(),c.positionName(),c.rankName());}
+ private static BookCommand bookDefaults(BookCommand c){return new BookCommand(c.personId(),c.bedId(),c.applicationCode(),c.liaison(),blank(c.bedType())?"":c.bedType().trim(),c.threePiece(),c.threePieceNote(),c.costCut(),c.promiseSigned(),c.cleaningRequired(),c.moveInWater(),c.moveInElectric(),c.moveOutWater(),c.moveOutElectric(),c.plannedMoveIn(),c.plannedMoveOut(),c.specialNote(),c.remark());}
+ private static UpdateStayCommand stayDefaults(UpdateStayCommand c){return new UpdateStayCommand(blank(c.name())?"":c.name().trim(),c.centerName(),blank(c.department())?"":c.department().trim(),blank(c.gender())?"":c.gender().trim(),blank(c.category())?"":c.category().trim(),c.positionName(),c.rankName(),c.applicationCode(),c.liaison(),blank(c.bedType())?"":c.bedType().trim(),c.threePiece(),c.threePieceNote(),c.costCut(),c.promiseSigned(),c.cleaningRequired(),c.moveInWater(),c.moveInElectric(),c.moveOutWater(),c.moveOutElectric(),c.plannedMoveIn(),c.plannedMoveOut(),c.specialNote(),c.remark());}
  private static int count(List<Stay> stays,StayStatus status){return(int)stays.stream().filter(s->s.status()==status).count();}
  private static void found(int n){if(n!=1)throw new ResponseStatusException(HttpStatus.NOT_FOUND);}
  private static ResponseStatusException bad(String m){return new ResponseStatusException(HttpStatus.BAD_REQUEST,m);} private static ResponseStatusException conflict(String m){return new ResponseStatusException(HttpStatus.CONFLICT,m);}

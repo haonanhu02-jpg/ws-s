@@ -4,6 +4,12 @@ import { chooseBedStay, classifyRoomBeds, editableGender, effectiveBeds, effecti
 describe("dormitory occupancy presentation", () => {
   const businessDate = "2026-09-15";
 
+  it("does not invent an arrival date for undated records", () => {
+    expect(effectiveOccupancyStatus({ status: "BOOKED", plannedMoveIn: null }, businessDate)).toBe("BOOKED");
+    expect(effectiveOccupancyStatus({ status: "CHECKED_IN", plannedMoveIn: null }, businessDate)).toBe("CHECKED_IN");
+    expect(chooseBedStay([{status: "BOOKED", plannedMoveIn: null}, {status: "BOOKED", plannedMoveIn: "2026-10-19"}], businessDate)).toBeDefined();
+  });
+
   it("turns imported/default gender placeholders into an optional blank input", () => {
     for (const value of [null, undefined, "", "未填写"]) expect(editableGender(value)).toBe("");
     expect(editableGender("男")).toBe("男"); expect(editableGender(" 女 ")).toBe("女");
