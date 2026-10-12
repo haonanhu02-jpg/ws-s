@@ -2,6 +2,7 @@
 import { computed, onMounted, onBeforeUnmount, reactive, ref } from "vue";
 import { useRouter } from "vue-router";
 import VisitorAccommodationPanel from "../components/VisitorAccommodationPanel.vue";
+import { matchesSettlementFilters, type SettlementFilter } from "../utils/settlementFilters";
 import { chooseBedStay, classifyRoomBeds, editableGender, effectiveBeds, effectiveOccupancyStatus, effectiveRooms, floorplanOccupancyStatus, hasVisibleOccupantName } from "../utils/dormitoryOccupancy";
 import {
   dormitoryApi,
@@ -134,7 +135,11 @@ const checkoutModal = ref(false),
   });
 const statistics = ref<DormitoryStatistics | null>(null);
 const attachmentModal=ref(false),attachmentStay=ref<Stay|null>(null),attachments=ref<StayAttachment[]>([]),attachmentType=ref('APPLICATION'),attachmentFile=ref<File|null>(null)
-const settlementEntries=ref<FeeSettlementEntry[]>([]),settlementPerson=ref(''),settlementAllMonths=ref(false)
+const settlementEntries=ref<FeeSettlementEntry[]>([]),settlementPerson=ref(''),settlementAllMonths=ref(true);
+const settlementFrom = ref(''), settlementTo = ref(''), settlementBuilding = ref(''), settlementType = ref('');
+const settlementFilters = ref<SettlementFilter[]>([]);
+const settlementRangeInvalid = computed(() => !!settlementFrom.value && !!settlementTo.value && settlementFrom.value > settlementTo.value);
+const settlementStayById = computed(() => new Map(stays.value.map(stay => [stay.id, stay])));
 const costCutStart = ref(`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}-01`);
 const costCutEnd = ref(new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai" }).format(new Date()));
 const costCutFilter = ref<"all" | "yes" | "no">("all");
@@ -175,7 +180,18 @@ const shownStayAudits = computed(() => {
 });
 const shownSettlementEntries = computed(() => {
   const order = new Map(shownBuildings.value.map((n, i) => [n.building.name, i]));
-  return settlementEntries.value.filter(e => order.has(e.buildingName)).sort((a, b) => (order.get(a.buildingName)! - order.get(b.buildingName)!));
+  if (settlementRangeInvalid.value) return [];
+  const keyword = settlementPerson.value.trim().toLocaleLowerCase();
+  return settlementEntries.value.filter(e => {
+    if (!order.has(e.buildingName) || (settlementBuilding.value && e.buildingName !== settlementBuilding.value)) return false;
+    if (!settlementAllMonths.value && e.billingMonth !== meterMonth.value) return false;
+    if (settlementFrom.value && e.billingMonth < settlementFrom.value) return false;
+    if (settlementTo.value && e.billingMonth > settlementTo.value) return false;
+    if (settlementType.value && e.batchStatus !== settlementType.value) return false;
+    const data = settlementLedgerData(e);
+    if (keyword && !Object.values(data).some(value => String(value ?? '').toLocaleLowerCase().includes(keyword))) return false;
+    return matchesSettlementFilters(data, settlementFilters.value);
+  }).sort((a, b) => (order.get(a.buildingName)! - order.get(b.buildingName)!) || b.billingMonth.localeCompare(a.billingMonth) || b.batchId - a.batchId);
 });
 const shownTotals = computed(() => {
   const enabledBuildings = shownBuildings.value.filter((n) => n.building.enabled);
@@ -307,6 +323,7 @@ const shownStatuses = computed(() => {
 });
 function selectBuilding(id: number | null) {
   selectedBuilding.value = id;
+  settlementBuilding.value = '';
   message.value = id === null ? "已切换至全集团" : `已切换至${shownBuildings.value[0]?.building.name ?? "所选楼栋"}`;
 }
 const activeStays = computed(() =>
@@ -551,7 +568,16 @@ async function loadMeters() {
       };
   }
 }
-async function loadFees(){settlementEntries.value=await dormitoryExtensionApi.settlements(settlementAllMonths.value?'':meterMonth.value,settlementPerson.value,null)}
+async function loadFees(){settlementEntries.value=await dormitoryExtensionApi.settlements('','',null)}
+async function queryFees(){
+  if (settlementRangeInvalid.value) return;
+  try { await loadFees(); } catch(e) { error.value = e instanceof Error ? e.message : '结算查询失败'; }
+}
+function resetSettlementFilters(){
+  settlementPerson.value=''; settlementAllMonths.value=true; settlementFrom.value=''; settlementTo.value='';
+  settlementBuilding.value=''; settlementType.value=''; settlementFilters.value=[];
+  return queryFees();
+}
 async function changeMeterMonth() {
   try {
     await Promise.all([loadMeters(),loadFees()]);
@@ -1290,6 +1316,17 @@ const FULL_STAY_HEADERS = [
   "计划入住", "计划退宿", "特殊说明", "备注",
 ];
 const FULL_STAY_EXPORT_HEADERS = [...FULL_STAY_HEADERS, "当前状态", "实际入住时间", "实际退宿时间"];
+const SETTLEMENT_FILTER_FIELDS = [...FULL_STAY_EXPORT_HEADERS, "结算月份", "结算批次", "记录类型", "居住天数", "计费天数", "同住人数", "应付水费", "应付电费", "总费用"];
+function settlementLedgerData(entry: FeeSettlementEntry): Record<string, unknown> {
+  const stay = settlementStayById.value.get(entry.stayId);
+  const values = stay ? [...fullStayRow(stay), statusLabel(effectiveStayStatus(stay) || stay.status), stay.checkedInAt || '', stay.checkedOutAt || ''] : [];
+  const data = Object.fromEntries(FULL_STAY_EXPORT_HEADERS.map((header, index) => [header, values[index] ?? '']));
+  // These values belong to the locked settlement, not the current editable stay.
+  return { ...data, 姓名: entry.personName, 部门: entry.department, 楼栋名称: entry.buildingName, 房号: entry.roomNo,
+    结算月份: entry.billingMonth, 结算批次: entry.batchId, 记录类型: entry.batchStatus === 'REVERSAL' ? '冲正' : '正常结算',
+    居住天数: entry.occupiedDays, 计费天数: entry.chargeableDays, 同住人数: entry.occupantCount,
+    应付水费: entry.waterAmount, 应付电费: entry.electricAmount, 总费用: entry.totalAmount };
+}
 function fullStayRow(stay: Stay): (string | number | boolean | null | undefined)[] {
   const location = stayLocation(stay);
   return [location.roomNo, stay.person.name, stay.person.centerName, stay.person.department, stay.person.gender, stay.person.category,
@@ -1305,6 +1342,7 @@ function exportFullStays() {
     shownStays.value.map((stay) => [...fullStayRow(stay), statusLabel(effectiveStayStatus(stay) || stay.status), localTime(stay.checkedInAt || ""), localTime(stay.checkedOutAt || "")]));
 }
 function exportFees() {
+  if (settlementRangeInvalid.value) return;
   return exportWorkbook(
     `员工水电分摊明细_${settlementAllMonths.value?'全部月份':meterMonth.value}`,
     "员工水电分摊明细",
@@ -1999,9 +2037,33 @@ onBeforeUnmount(() => {
             </div>
           </div>
           <section class="fee-section">
-            <div class="section-title"><div><h3>月底员工水电结算</h3><small>水费15元/吨；电费0.7元/度；盛心公寓每房每月免费电量10度，伏龙宿舍每房每月免费电量5度。结算记录锁定，修正须冲正后重新生成。</small></div><div class="row-actions"><button class="secondary-button" @click="exportFees">导出Excel</button><button @click="generateFees">生成本月结算</button></div></div>
-            <div class="fee-rule-grid"><label>查询人员<input v-model="settlementPerson" placeholder="姓名或部门" @keyup.enter="loadFees"/></label><label class="choice"><input v-model="settlementAllMonths" type="checkbox" @change="loadFees"/> 查询全部月份</label><button class="secondary-button" @click="loadFees">查询</button></div>
-            <div class="table-wrap"><table><thead><tr><th>月份/批次</th><th>人员</th><th>楼栋/房间</th><th>居住/计费天数</th><th>水量/水费</th><th>电量/免费抵扣</th><th>应付电费</th><th>合计</th><th>类型</th><th>操作</th></tr></thead><tbody><tr v-for="e in shownSettlementEntries" :key="e.id"><td>{{e.billingMonth}} / {{e.batchId}}</td><td>{{e.personName}}<small>{{e.department}}</small></td><td>{{e.buildingName}} / {{e.roomNo}}</td><td>{{e.occupiedDays}} / {{e.chargeableDays}}</td><td>{{e.waterUsage}} / ¥{{e.waterAmount}}</td><td>{{e.electricUsage}} / {{e.freeElectricUsage}}度（¥{{e.freeElectricAmount}}）</td><td>¥{{e.electricAmount}}</td><td><b>¥{{e.totalAmount}}</b></td><td>{{e.batchStatus==='REVERSAL'?'冲正':'正常结算'}}</td><td><button v-if="e.batchStatus==='GENERATED'" class="secondary" @click="reverseFee(e.batchId)">冲正本批次</button></td></tr><tr v-if="!shownSettlementEntries.length"><td colspan="10" class="empty-cell">暂无结算记录。生成前需保存本月及上月水电表读数。</td></tr></tbody></table></div>
+            <div class="section-title"><div><h3>月底员工水电结算</h3><small>水费15元/吨；电费0.7元/度；盛心公寓每房每月免费电量10度，伏龙宿舍每房每月免费电量5度。结算记录锁定，修正须冲正后重新生成。</small></div><div class="row-actions"><button class="secondary-button"  :disabled="settlementRangeInvalid" @click="exportFees">导出Excel</button><button @click="generateFees">生成本月结算</button></div></div>
+            <div class="settlement-search">
+              <div class="fee-rule-grid">
+                <label>查询人员／台账关键词<input v-model="settlementPerson" placeholder="姓名、中心、部门、房号等" @keyup.enter="queryFees"/></label>
+                <label>结算开始月份<input v-model="settlementFrom" type="month" @change="settlementAllMonths = true" /></label>
+                <label>结算截止月份<input v-model="settlementTo" type="month" @change="settlementAllMonths = true" /></label>
+                <label>宿舍区域<select v-model="settlementBuilding"><option value="">当前范围全部宿舍</option><option v-for="node in shownBuildings" :key="node.building.id" :value="node.building.name">{{ buildingTabLabel(node.building.name) }}</option></select></label>
+                <label>记录类型<select v-model="settlementType"><option value="">全部</option><option value="GENERATED">正常结算</option><option value="REVERSAL">冲正</option></select></label>
+                <label class="choice"><input v-model="settlementAllMonths" type="checkbox"/> 查询全部月份</label>
+                <button class="secondary-button" :disabled="settlementRangeInvalid" @click="queryFees">查询</button>
+                <button class="secondary-button" @click="resetSettlementFilters">重置</button>
+              </div>
+              <details class="settlement-advanced">
+                <summary>更多台账条件（全部字段）<span v-if="settlementFilters.length"> · {{ settlementFilters.length }} 项</span></summary>
+                <p class="muted">条件同时满足才显示；未填写条件不限制。姓名、部门、房间及费用使用锁定结算值，其他字段使用关联住宿台账当前信息；台账已删除时这些字段为空，不猜测补齐。</p>
+                <div v-for="(filter, index) in settlementFilters" :key="index" class="settlement-filter-row">
+                  <label>台账字段<select v-model="filter.field"><option value="">不筛选</option><option v-for="field in SETTLEMENT_FILTER_FIELDS" :key="field">{{ field }}</option></select></label>
+                  <label>匹配方式<select v-model="filter.operator"><option value="contains">包含</option><option value="equals">等于</option><option value="gte">大于或等于／不早于</option><option value="lte">小于或等于／不晚于</option><option value="empty">为空</option><option value="notEmpty">不为空</option></select></label>
+                  <label>条件值<input v-model="filter.value" :disabled="filter.operator === 'empty' || filter.operator === 'notEmpty'" :type="['计划入住','计划退宿','实际入住时间','实际退宿时间'].includes(filter.field) ? 'date' : filter.field === '结算月份' ? 'month' : 'text'" placeholder="留空不限制" @keyup.enter="queryFees" /></label>
+                  <button class="secondary-button" @click="settlementFilters.splice(index, 1)">移除条件</button>
+                </div>
+                <button class="secondary-button" @click="settlementFilters.push({ field: '', operator: 'contains', value: '' })">添加筛选条件</button>
+              </details>
+              <p v-if="settlementRangeInvalid" class="notice-error">结算开始月份不能晚于截止月份。</p>
+              <p class="muted settlement-result-note">当前 {{ shownSettlementEntries.length }} 条结算记录；导出 Excel 与当前筛选结果一致。{{ settlementAllMonths ? '结算月份范围可跨月查询。' : `仅查询抄表选定月份 ${meterMonth}。` }}</p>
+            </div>
+            <div class="table-wrap"><table><thead><tr><th>月份/批次</th><th>人员</th><th>楼栋/房间</th><th>居住/计费天数</th><th>水量/水费</th><th>电量/免费抵扣</th><th>应付电费</th><th>合计</th><th>类型</th><th>操作</th></tr></thead><tbody><tr v-for="e in shownSettlementEntries" :key="e.id"><td>{{e.billingMonth}} / {{e.batchId}}</td><td>{{e.personName}}<small>{{e.department}}</small></td><td>{{e.buildingName}} / {{e.roomNo}}</td><td>{{e.occupiedDays}} / {{e.chargeableDays}}</td><td>{{e.waterUsage}} / ¥{{e.waterAmount}}</td><td>{{e.electricUsage}} / {{e.freeElectricUsage}}度（¥{{e.freeElectricAmount}}）</td><td>¥{{e.electricAmount}}</td><td><b>¥{{e.totalAmount}}</b></td><td>{{e.batchStatus==='REVERSAL'?'冲正':'正常结算'}}</td><td><button v-if="e.batchStatus==='GENERATED'" class="secondary" @click="reverseFee(e.batchId)">冲正本批次</button></td></tr><tr v-if="!shownSettlementEntries.length"><td colspan="10" class="empty-cell">{{ settlementEntries.length ? '没有符合当前筛选条件的结算记录。' : '暂无结算记录。生成前需保存本月及上月水电表读数。' }}</td></tr></tbody></table></div>
           </section></template
         >
         <template v-else-if="!loading && active === 'archive'"

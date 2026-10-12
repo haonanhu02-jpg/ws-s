@@ -1197,3 +1197,14 @@ tbody tr:hover { background: var(--d86-brand-soft); }
 .dormitory-layout .capacity-table .capacity-row-total { position: sticky; right: 0; min-width: 72px; font-weight: 700; color: var(--d86-brand); background: var(--d86-surface); border-left: 1px solid var(--d86-line); }
 .dormitory-layout .capacity-table th.capacity-row-total { background: #f1f5f9; }
 .dormitory-layout .capacity-table .summary-total .capacity-row-total { background: var(--d86-brand-soft-2); }
+
+.dormitory-layout .fee-section .settlement-search .fee-rule-grid{grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;justify-content:stretch}
+.dormitory-layout .settlement-search select{height:40px;width:100%;padding:8px 10px;margin:0}
+.dormitory-layout .settlement-advanced{margin:0 0 12px;padding:12px;border:1px solid var(--d86-line);border-radius:8px}
+.dormitory-layout .settlement-advanced summary{cursor:pointer;color:var(--d86-brand);font-size:13px;font-weight:600}
+.dormitory-layout .settlement-advanced .muted,.dormitory-layout .settlement-result-note{font-size:12px;line-height:1.6}
+.dormitory-layout .settlement-filter-row{display:grid;grid-template-columns:1fr 1fr 1.2fr auto;gap:12px;align-items:end;margin:12px 0}
+.dormitory-layout .settlement-filter-row label{min-width:0;display:grid;gap:6px;font-size:13px}
+.dormitory-layout .settlement-filter-row input{height:40px;padding:8px 10px;margin:0;width:100%;min-width:0}
+.dormitory-layout .settlement-advanced button{width:auto;min-height:40px;margin:0;padding:8px 12px}
+@media(max-width:680px){.dormitory-layout .settlement-filter-row{grid-template-columns:1fr}.dormitory-layout .fee-section .settlement-search .fee-rule-grid{grid-template-columns:1fr}}
