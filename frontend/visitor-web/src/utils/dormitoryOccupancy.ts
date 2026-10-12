@@ -40,22 +40,24 @@ export function floorplanOccupancyStatus(stay: GenderedStay | undefined, busines
 }
 
 export function classifyRoomBeds(stays: Array<GenderedStay | undefined>, businessDate: string, roomType = "标间", unavailable: boolean[] = []) {
-  const result = { freePending: 0, freeMale: 0, freeFemale: 0, occupiedMale: 0, occupiedFemale: 0, bookedMale: 0, bookedFemale: 0 };
+  const result = { freePending: 0, freeMale: 0, freeFemale: 0, occupiedMale: 0, occupiedFemale: 0, bookedMale: 0, bookedFemale: 0, occupiedOther: 0, bookedOther: 0, cleaning: 0 };
   const genders = new Set(stays.filter((stay, index) => !unavailable[index] && floorplanOccupancyStatus(stay, businessDate) === "CHECKED_IN")
-    .map((stay) => stay!.person.gender));
+    .map((stay) => editableGender(stay!.person.gender)));
   const currentGender = roomType.includes("标间") && genders.size === 1 ? [...genders][0] : undefined;
   for (const [index, stay] of stays.entries()) {
-    if (unavailable[index]) continue;
+    if (unavailable[index]) { result.cleaning += 1; continue; }
     const status = floorplanOccupancyStatus(stay, businessDate);
     if (!status) {
       if (currentGender === "男") result.freeMale += 1;
       else if (currentGender === "女") result.freeFemale += 1;
       else result.freePending += 1;
     } else if (status === "CHECKED_IN") {
-      if (stay!.person.gender === "男") result.occupiedMale += 1;
-      else if (stay!.person.gender === "女") result.occupiedFemale += 1;
-    } else if (stay!.person.gender === "男") result.bookedMale += 1;
-    else if (stay!.person.gender === "女") result.bookedFemale += 1;
+      if (editableGender(stay!.person.gender) === "男") result.occupiedMale += 1;
+      else if (editableGender(stay!.person.gender) === "女") result.occupiedFemale += 1;
+      else result.occupiedOther += 1;
+    } else if (editableGender(stay!.person.gender) === "男") result.bookedMale += 1;
+    else if (editableGender(stay!.person.gender) === "女") result.bookedFemale += 1;
+    else result.bookedOther += 1;
   }
   return result;
 }

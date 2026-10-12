@@ -239,7 +239,7 @@ function capacityForRooms(scopedRooms: Room[]) {
   const labels = ["单间", "标间"];
   return labels.map((label) => {
     const rooms = scopedRooms.filter((room) => (room.roomType.includes("标间") ? "标间" : "单间") === label);
-    const row = { label, freePending: 0, freeMale: 0, freeFemale: 0, occupiedMale: 0, occupiedFemale: 0, bookedMale: 0, bookedFemale: 0 };
+    const row = { label, ...classifyRoomBeds([], today()) };
     for (const room of rooms) {
       const beds = room.beds.filter((bed) => bed.enabled);
       const roomCounts = classifyRoomBeds(beds.map((bed) => displayStayForBed(bed.id)), today(), room.roomType, beds.map((bed) => bed.cleaningRequired));
@@ -249,7 +249,7 @@ function capacityForRooms(scopedRooms: Room[]) {
   });
 }
 function capacityRowTotal(row: ReturnType<typeof capacityForRooms>[number]) {
-  return row.freePending + row.freeMale + row.freeFemale + row.occupiedMale + row.occupiedFemale + row.bookedMale + row.bookedFemale;
+  return row.freePending + row.freeMale + row.freeFemale + row.occupiedMale + row.occupiedFemale + row.bookedMale + row.bookedFemale + row.occupiedOther + row.bookedOther + row.cleaning;
 }
 function totalCapacity(rows: ReturnType<typeof capacityForRooms>) { return rows.reduce((total, row) => ({
   label: "合计",
@@ -260,7 +260,10 @@ function totalCapacity(rows: ReturnType<typeof capacityForRooms>) { return rows.
   occupiedFemale: total.occupiedFemale + row.occupiedFemale,
   bookedMale: total.bookedMale + row.bookedMale,
   bookedFemale: total.bookedFemale + row.bookedFemale,
-}), { label: "合计", freePending: 0, freeMale: 0, freeFemale: 0, occupiedMale: 0, occupiedFemale: 0, bookedMale: 0, bookedFemale: 0 }); }
+  occupiedOther: total.occupiedOther + row.occupiedOther,
+  bookedOther: total.bookedOther + row.bookedOther,
+  cleaning: total.cleaning + row.cleaning,
+}), { label: "合计", ...classifyRoomBeds([], today()) }); }
 const buildingCapacitySummaries = computed(() => shownBuildings.value.map(node => {
   const rooms = effectiveRooms([node]);
   const rows = capacityForRooms(rooms);
@@ -1509,10 +1512,10 @@ function exportStatistics() {
   return exportWorkbook(
     "宿舍统计报表",
     "楼栋统计",
-    ["楼栋", "房型", "可入住待定", "可入住男", "可入住女", "已入住男", "已入住女", "已预定男", "已预定女", "入住率", "总计"],
+    ["楼栋", "房型", "可入住待定", "可入住男", "可入住女", "已入住男", "已入住女", "已预定男", "已预定女", "已入住其他", "已预订其他", "待打扫", "入住率", "总计"],
     buildingCapacitySummaries.value.flatMap((summary) => [...summary.rows, summary.total].map((row) => [
       summary.name, row.label, row.freePending, row.freeMale, row.freeFemale,
-      row.occupiedMale, row.occupiedFemale, row.bookedMale, row.bookedFemale, summary.rate, capacityRowTotal(row),
+      row.occupiedMale, row.occupiedFemale, row.bookedMale, row.bookedFemale, row.occupiedOther, row.bookedOther, row.cleaning, summary.rate, capacityRowTotal(row),
     ])),
   );
 }
@@ -1570,16 +1573,16 @@ onBeforeUnmount(() => {
             </article>
           </div>
           <div class="section-title"><h3 class="stat-section-title">统计总览 · 表格（含淡蓝合计行）</h3><button class="secondary-button" @click="exportStatistics">导出统计总览</button></div>
-          <p class="muted">可入住合计与平面图绿色床位一致，不含待打扫及停用床位。仅已有入住人员且性别一致的标间按男／女分类；空标间、空单间及性别未定的可入住床位计入待定。</p>
+          <p class="muted">可入住合计与平面图绿色床位一致，不含待打扫及停用床位。仅已有入住人员且性别一致的标间按男／女分类；空标间、空单间及性别未定的可入住床位计入待定。入住／预订人员未填写有效性别时计入对应“其他”，待打扫单列；总计与上方有效床位总数一致，停用资源不计入。</p>
           <div class="statistics-grid">
             <article v-for="summary in buildingCapacitySummaries" :key="summary.id" class="stat-summary-block">
               <h3>{{ summary.name }}总览</h3>
               <div class="table-wrap">
                 <table class="capacity-table">
-                  <thead><tr><th>房型</th><th>可入住待定</th><th>可入住男</th><th>可入住女</th><th>已入住男</th><th>已入住女</th><th>已预定男</th><th>已预定女</th><th class="capacity-row-total">总计</th></tr></thead>
+                  <thead><tr><th>房型</th><th>可入住待定</th><th>可入住男</th><th>可入住女</th><th>已入住男</th><th>已入住女</th><th>已预定男</th><th>已预定女</th><th>已入住其他</th><th>已预订其他</th><th>待打扫</th><th class="capacity-row-total">总计</th></tr></thead>
                   <tbody>
-                    <tr v-for="row in summary.rows" :key="row.label"><td>{{ row.label }}</td><td>{{ row.freePending }}</td><td>{{ row.freeMale }}</td><td>{{ row.freeFemale }}</td><td>{{ row.occupiedMale }}</td><td>{{ row.occupiedFemale }}</td><td>{{ row.bookedMale }}</td><td>{{ row.bookedFemale }}</td><td class="capacity-row-total">{{ capacityRowTotal(row) }}</td></tr>
-                    <tr class="summary-total"><td>{{ summary.total.label }}</td><td>{{ summary.total.freePending }}</td><td>{{ summary.total.freeMale }}</td><td>{{ summary.total.freeFemale }}</td><td>{{ summary.total.occupiedMale }}</td><td>{{ summary.total.occupiedFemale }}</td><td>{{ summary.total.bookedMale }}</td><td>{{ summary.total.bookedFemale }}</td><td class="capacity-row-total">{{ capacityRowTotal(summary.total) }}</td></tr>
+                    <tr v-for="row in summary.rows" :key="row.label"><td>{{ row.label }}</td><td>{{ row.freePending }}</td><td>{{ row.freeMale }}</td><td>{{ row.freeFemale }}</td><td>{{ row.occupiedMale }}</td><td>{{ row.occupiedFemale }}</td><td>{{ row.bookedMale }}</td><td>{{ row.bookedFemale }}</td><td>{{ row.occupiedOther }}</td><td>{{ row.bookedOther }}</td><td>{{ row.cleaning }}</td><td class="capacity-row-total">{{ capacityRowTotal(row) }}</td></tr>
+                    <tr class="summary-total"><td>{{ summary.total.label }}</td><td>{{ summary.total.freePending }}</td><td>{{ summary.total.freeMale }}</td><td>{{ summary.total.freeFemale }}</td><td>{{ summary.total.occupiedMale }}</td><td>{{ summary.total.occupiedFemale }}</td><td>{{ summary.total.bookedMale }}</td><td>{{ summary.total.bookedFemale }}</td><td>{{ summary.total.occupiedOther }}</td><td>{{ summary.total.bookedOther }}</td><td>{{ summary.total.cleaning }}</td><td class="capacity-row-total">{{ capacityRowTotal(summary.total) }}</td></tr>
                   </tbody>
                 </table>
               </div>

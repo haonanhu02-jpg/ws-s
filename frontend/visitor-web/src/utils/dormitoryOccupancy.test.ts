@@ -4,6 +4,23 @@ import { chooseBedStay, classifyRoomBeds, editableGender, effectiveBeds, effecti
 describe("dormitory occupancy presentation", () => {
   const businessDate = "2026-09-15";
 
+  it("reconciles 51 beds with 36 occupants including two without gender", () => {
+    const stay = (gender: string) => ({ status: "CHECKED_IN" as const, plannedMoveIn: "2026-09-01", person: { name: "入住人", gender } });
+    const beds = [...Array(20).fill(stay("男")), ...Array(14).fill(stay("女")), stay(""), stay("未填写"), ...Array(13).fill(undefined), ...Array(2).fill({ ...stay("男"), status: "BOOKED", plannedMoveIn: "2026-10-19" })];
+    const counts = classifyRoomBeds(beds, businessDate, "单间");
+    expect(counts).toMatchObject({ occupiedMale: 20, occupiedFemale: 14, occupiedOther: 2, bookedMale: 2 });
+    expect(Object.values(counts).reduce((sum, value) => sum + value, 0)).toBe(51);
+  });
+
+  it("retains unknown genders and cleaning beds in separate categories", () => {
+    for (const gender of ["", "未填写", "未知", null, undefined]) {
+      const stay = { status: "BOOKED" as const, plannedMoveIn: "2026-10-19", person: { name: "预订人", gender: gender as unknown as string } };
+      const counts = classifyRoomBeds([stay, undefined], businessDate, "标间", [false, true]);
+      expect(counts).toMatchObject({ bookedOther: 1, cleaning: 1, freePending: 0 });
+      expect(Object.values(counts).reduce((sum, value) => sum + value, 0)).toBe(2);
+    }
+  });
+
   it("does not invent an arrival date for undated records", () => {
     expect(effectiveOccupancyStatus({ status: "BOOKED", plannedMoveIn: null }, businessDate)).toBe("BOOKED");
     expect(effectiveOccupancyStatus({ status: "CHECKED_IN", plannedMoveIn: null }, businessDate)).toBe("CHECKED_IN");

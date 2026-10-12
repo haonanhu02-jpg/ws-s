@@ -14,6 +14,11 @@ const {chromium} = require(process.env.PLAYWRIGHT_MODULE || 'C:/Users/12778/.cac
    if(['live','book'].includes(state))stays.push({id,bed,person:{id,name:'人员'+id,gender:'男',department:'部门'},status:'BOOKED',plannedMoveIn:state==='live'?'2026-10-01':'2026-11-01',costCut:false,cleaningRequired:false});
    return {id,buildingId:i+1,roomNo:['210','209','208','207','206','205'][j],floorNo:2,roomType:'单间',enabled:state!=='disabled',livable:state!=='public',cleaningRequired:state==='clean',beds:[bed]};
   })}));
+  for(const [index,node]of nodes.entries())for(const [offset,status]of ['CHECKED_IN','BOOKED'].entries()){
+   const id=index*10+7+offset,bed={id,roomId:id,label:'单床',bedCode:node.building.name+'-other-'+offset,enabled:true,cleaningRequired:false};
+   node.rooms.push({id,buildingId:node.building.id,roomNo:String(201+offset),floorNo:2,roomType:'单间',enabled:true,livable:true,cleaningRequired:false,beds:[bed]});
+   stays.push({id,bed,person:{id,name:'未知性别'+id,gender:offset?'未填写':'',department:'部门'},status,plannedMoveIn:offset?'2026-11-01':'2026-10-01',costCut:false,cleaningRequired:false});
+  }
   await page.route('**/api/visitor/**',route=>{
    assert.equal(route.request().method(),'GET','diagnostic must not write business data');
    const path=new URL(route.request().url()).pathname;
@@ -29,13 +34,26 @@ const {chromium} = require(process.env.PLAYWRIGHT_MODULE || 'C:/Users/12778/.cac
     const values=(await row.locator('td').allTextContents()).slice(1).map(Number);
     assert.equal(values.at(-1),values.slice(0,-1).reduce((a,b)=>a+b,0));
    }
-   assert.equal(await table.locator('tbody tr.summary-total td').last().innerText(),'3');
+   assert.equal(await table.locator('tbody tr.summary-total td').last().innerText(),'6');
+   const cells=await table.locator('tbody tr.summary-total td').allTextContents();
+   assert.deepEqual(cells.slice(-4),['1','1','1','6'],'Unknown occupied/booked genders and cleaning bed remain in total');
   }
+  for(const node of nodes){
+   await page.locator('.region-tabs button').filter({hasText:node.building.name}).click();
+   assert.equal(await page.locator('.stat-body').filter({hasText:'床位总数'}).locator('b').innerText(),'6');
+   assert.equal(await page.locator('.capacity-table .summary-total td').last().innerText(),'6');
+  }
+  await page.locator('.region-tabs button').filter({hasText:'全集团'}).click();
   const downloadPromise=page.waitForEvent('download');
   await page.getByRole('button',{name:'导出统计总览',exact:true}).click();
   const download=await downloadPromise,workbook=new ExcelJS.Workbook();await workbook.xlsx.readFile(await download.path());
   const sheet=workbook.worksheets[0],headers=sheet.getRow(1).values;assert.equal(headers.at(-1),'总计');
-  for(let r=2;r<=sheet.rowCount;r++)assert.equal(sheet.getRow(r).getCell(sheet.columnCount).value,sheet.getRow(r).getCell(2).value==='标间'?0:3);
+  assert.ok(headers.includes('已入住其他'));assert.ok(headers.includes('已预订其他'));assert.ok(headers.includes('待打扫'));
+  for(let r=2;r<=sheet.rowCount;r++){
+   const row=sheet.getRow(r),total=row.getCell(sheet.columnCount).value;
+   assert.equal(total,row.getCell(2).value==='标间'?0:6);
+   assert.equal(total,row.values.slice(3,13).reduce((sum,value)=>sum+Number(value),0),'Excel categories reconcile with capacity');
+  }
   await page.locator('.dorm-nav button').filter({hasText:'可视化平面图'}).click();
   await page.locator('.region-tabs button').filter({hasText:'盛心公寓'}).click();
   const originalRoom=no=>page.locator('.fp-room').filter({has:page.locator('header strong',{hasText:no})});

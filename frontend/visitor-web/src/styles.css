@@ -313,9 +313,9 @@ th:last-child,td:last-child{border-right:0}th{background:#f5f6f8;color:#4b5563;f
 .dormitory-layout .bed-list button.booked{border-color:var(--d86-warn-line);background:var(--d86-warn-soft);color:var(--d86-warn)}
 .dormitory-layout .statistics-grid{display:block}
 .dormitory-layout .stat-summary-block{max-width:none;padding:16px}
-.dormitory-layout .stat-summary-block>.table-wrap{width:min(100%,720px);border-radius:0}
+.dormitory-layout .stat-summary-block>.table-wrap{width:min(100%,1100px);border-radius:0}
 .dormitory-layout .stat-summary-block h3{margin:0 0 12px;color:var(--d86-brand);font-size:16px}
-.dormitory-layout .capacity-table{width:100%;min-width:720px}
+.dormitory-layout .capacity-table{width:100%;min-width:1100px}
 .dormitory-layout .capacity-table .summary-total td{background:var(--d86-brand-soft-2);color:var(--d86-brand);font-weight:600}
 .dormitory-layout .rate-line{margin:8px 0 0}.dormitory-layout .rate-line b{color:var(--d86-brand);font-size:16px}
 .dormitory-layout .warning-columns article p:not(.muted){display:inline-flex;margin:4px 8px 4px 0;padding:8px 12px;border:1px solid var(--d86-line);border-radius:6px;background:var(--d86-surface-2)}
