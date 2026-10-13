@@ -185,8 +185,8 @@ const shownSettlementEntries = computed(() => {
   return settlementEntries.value.filter(e => {
     if (!order.has(e.buildingName) || (settlementBuilding.value && e.buildingName !== settlementBuilding.value)) return false;
     if (!settlementAllMonths.value && e.billingMonth !== meterMonth.value) return false;
-    if (settlementFrom.value && e.billingMonth < settlementFrom.value) return false;
-    if (settlementTo.value && e.billingMonth > settlementTo.value) return false;
+    if (settlementFrom.value && e.billingMonth < settlementFrom.value.slice(0, 7)) return false;
+    if (settlementTo.value && e.billingMonth > settlementTo.value.slice(0, 7)) return false;
     if (settlementType.value && e.batchStatus !== settlementType.value) return false;
     const data = settlementLedgerData(e);
     if (keyword && !Object.values(data).some(value => String(value ?? '').toLocaleLowerCase().includes(keyword))) return false;
@@ -2041,8 +2041,8 @@ onBeforeUnmount(() => {
             <div class="settlement-search">
               <div class="fee-rule-grid">
                 <label>查询人员／台账关键词<input v-model="settlementPerson" placeholder="姓名、中心、部门、房号等" @keyup.enter="queryFees"/></label>
-                <label>结算开始月份<input v-model="settlementFrom" type="month" @change="settlementAllMonths = true" /></label>
-                <label>结算截止月份<input v-model="settlementTo" type="month" @change="settlementAllMonths = true" /></label>
+                <label>开始日期<input v-model="settlementFrom" type="date" @change="settlementAllMonths = true" /></label>
+                <label>截止日期<input v-model="settlementTo" type="date" @change="settlementAllMonths = true" /></label>
                 <label>宿舍区域<select v-model="settlementBuilding"><option value="">当前范围全部宿舍</option><option v-for="node in shownBuildings" :key="node.building.id" :value="node.building.name">{{ buildingTabLabel(node.building.name) }}</option></select></label>
                 <label>记录类型<select v-model="settlementType"><option value="">全部</option><option value="GENERATED">正常结算</option><option value="REVERSAL">冲正</option></select></label>
                 <label class="choice"><input v-model="settlementAllMonths" type="checkbox"/> 查询全部月份</label>
@@ -2060,8 +2060,8 @@ onBeforeUnmount(() => {
                 </div>
                 <button class="secondary-button" @click="settlementFilters.push({ field: '', operator: 'contains', value: '' })">添加筛选条件</button>
               </details>
-              <p v-if="settlementRangeInvalid" class="notice-error">结算开始月份不能晚于截止月份。</p>
-              <p class="muted settlement-result-note">当前 {{ shownSettlementEntries.length }} 条结算记录；导出 Excel 与当前筛选结果一致。{{ settlementAllMonths ? '结算月份范围可跨月查询。' : `仅查询抄表选定月份 ${meterMonth}。` }}</p>
+              <p v-if="settlementRangeInvalid" class="notice-error">开始日期不能晚于截止日期。</p>
+              <p class="muted settlement-result-note">当前 {{ shownSettlementEntries.length }} 条结算记录；导出 Excel 与当前筛选结果一致。{{ settlementAllMonths ? '按所选日期覆盖的结算月份查询，不拆分或重算月度费用。' : `仅查询抄表选定月份 ${meterMonth}。` }}</p>
             </div>
             <div class="table-wrap"><table><thead><tr><th>月份/批次</th><th>人员</th><th>楼栋/房间</th><th>居住/计费天数</th><th>水量/水费</th><th>电量/免费抵扣</th><th>应付电费</th><th>合计</th><th>类型</th><th>操作</th></tr></thead><tbody><tr v-for="e in shownSettlementEntries" :key="e.id"><td>{{e.billingMonth}} / {{e.batchId}}</td><td>{{e.personName}}<small>{{e.department}}</small></td><td>{{e.buildingName}} / {{e.roomNo}}</td><td>{{e.occupiedDays}} / {{e.chargeableDays}}</td><td>{{e.waterUsage}} / ¥{{e.waterAmount}}</td><td>{{e.electricUsage}} / {{e.freeElectricUsage}}度（¥{{e.freeElectricAmount}}）</td><td>¥{{e.electricAmount}}</td><td><b>¥{{e.totalAmount}}</b></td><td>{{e.batchStatus==='REVERSAL'?'冲正':'正常结算'}}</td><td><button v-if="e.batchStatus==='GENERATED'" class="secondary" @click="reverseFee(e.batchId)">冲正本批次</button></td></tr><tr v-if="!shownSettlementEntries.length"><td colspan="10" class="empty-cell">{{ settlementEntries.length ? '没有符合当前筛选条件的结算记录。' : '暂无结算记录。生成前需保存本月及上月水电表读数。' }}</td></tr></tbody></table></div>
           </section></template

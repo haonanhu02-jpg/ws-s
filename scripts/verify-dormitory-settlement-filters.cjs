@@ -24,7 +24,12 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'C:/Users/12778/.c
   const section=page.locator('.fee-section'), rows=section.locator('tbody tr').filter({hasNot:page.locator('.empty-cell')});
   const field=label=>section.locator('.fee-rule-grid label').filter({hasText:label}).locator('input:not([type=checkbox]),select');
   assert.equal(await rows.count(),9);
-  await field('结算开始月份').fill('2026-09');await field('结算截止月份').fill('2026-09');assert.equal(await rows.count(),4);
+  assert.equal(await field('开始日期').getAttribute('type'),'date');assert.equal(await field('截止日期').getAttribute('type'),'date');
+  await field('开始日期').fill('2026-09-15');assert.equal(await rows.count(),8,'Open-ended start retains September and October bills');
+  await field('截止日期').fill('2026-10-05');assert.equal(await rows.count(),8,'Date range covers both boundary billing months');
+  await field('开始日期').fill('');await field('截止日期').fill('2026-09-15');assert.equal(await rows.count(),5,'Open-ended end includes prior months');
+  await field('开始日期').fill('2026-09-16');assert.equal(await rows.count(),0,'Reversed days in the same month are invalid');
+  await field('开始日期').fill('2026-09-15');await field('截止日期').fill('2026-09-15');assert.equal(await rows.count(),4);
   await field('宿舍区域').selectOption('伏龙宿舍');assert.equal(await rows.count(),1);
   await section.locator('summary').click();await section.getByRole('button',{name:'添加筛选条件'}).click();
   const condition=section.locator('.settlement-filter-row').first();
@@ -38,7 +43,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'C:/Users/12778/.c
   await section.getByRole('button',{name:'重置',exact:true}).click();assert.equal(await rows.count(),9);
   for(const name of names){await page.locator('.region-tabs button').filter({hasText:name}).click();assert.equal(await rows.count(),name===names[0]?3:2);}
   await page.locator('.region-tabs button').filter({hasText:'全集团'}).click();
-  await field('结算开始月份').fill('2026-10');await field('结算截止月份').fill('2026-09');assert.equal(await rows.count(),0);assert.equal(await section.getByRole('button',{name:'查询',exact:true}).isDisabled(),true);
+  await field('开始日期').fill('2026-10-05');await field('截止日期').fill('2026-09-15');assert.equal(await rows.count(),0);assert.equal(await section.getByRole('button',{name:'查询',exact:true}).isDisabled(),true);
   await section.getByRole('button',{name:'重置',exact:true}).click();
   await section.getByRole('button',{name:'添加筛选条件'}).click();
   await condition.locator('select').first().selectOption('中心');await condition.locator('select').nth(1).selectOption('empty');assert.equal(await rows.count(),1);assert.match(await rows.innerText(),/仅历史结算/);
