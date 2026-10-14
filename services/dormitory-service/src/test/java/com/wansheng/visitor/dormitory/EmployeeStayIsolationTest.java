@@ -33,7 +33,32 @@ class EmployeeStayIsolationTest {
   long bed=repo.addBed(new BedCommand(room,"单床","测试公寓-"+no+"-单床",null,true));
   return service.book(new BookCommand(person,bed,null,null,"长住房",null,null,false,null,false,null,null,null,null,IN,null,null,null),"test");
  }
- private UpdateStayCommand details(String name){return new UpdateStayCommand(name,"新中心","新部门","男","己审批长住员工","新岗位","新职级","APP-309",null,"长住房",null,null,false,null,false,null,null,null,null,IN,null,null,null);}
+ private UpdateStayCommand details(String name){return details(name,null);}
+ private UpdateStayCommand details(String name,LocalDate end){return new UpdateStayCommand(name,"新中心","新部门","男","己审批长住员工","新岗位","新职级","APP-309",null,"长住房",null,null,false,null,false,null,null,null,null,IN,end,null,null);}
+ @ParameterizedTest @ValueSource(strings={"盛心公寓","伏龙宿舍","花城宿舍","岙底罗"})
+ void arrivalConfirmationIsIndependentAndPersistsPerStay(String name){
+  long building=repo.addBuilding(new BuildingCommand(name+"确认测试","测试",true,0));
+  Stay current=book(room309.person().id(),building,"201");
+  service.extend(current.id(),new ExtendCommand(IN.plusDays(10),null),"test");current=service.stay(current.id());
+  Stay next=service.book(new BookCommand(current.person().id(),current.bed().id(),"NEXT",null,"长住房",null,null,false,null,false,null,null,null,null,IN.plusDays(11),null,null,null),"test");
+  assertThat(current.arrivalConfirmed()).isFalse();assertThat(next.arrivalConfirmed()).isFalse();
+  Stay checked=service.setArrivalConfirmation(current.id(),new ArrivalConfirmationCommand(true,current.version()),"operator");
+  assertThat(checked.arrivalConfirmed()).isTrue();assertThat(repo.stay(current.id()).orElseThrow().arrivalConfirmed()).isTrue();
+  assertThat(checked).usingRecursiveComparison().ignoringFields("version","arrivalConfirmed").isEqualTo(current);
+  assertThat(service.stay(next.id())).isEqualTo(next);assertThat(service.stay(room313.id())).isEqualTo(room313);
+  assertThatThrownBy(()->service.setArrivalConfirmation(checked.id(),new ArrivalConfirmationCommand(false,checked.version()-1),"test")).isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+  assertThat(service.stay(checked.id()).arrivalConfirmed()).isTrue();
+  Stay edited=service.updateStay(checked.id(),details("只改此人",checked.plannedMoveOut()),"test");
+  assertThat(edited.arrivalConfirmed()).isTrue();
+  Stay unchecked=service.setArrivalConfirmation(edited.id(),new ArrivalConfirmationCommand(false,edited.version()),"operator");
+  assertThat(unchecked.arrivalConfirmed()).isFalse();assertThat(unchecked.status()).isEqualTo(StayStatus.BOOKED);assertThat(unchecked.checkedInAt()).isNull();
+  assertThat(service.stayAudits().stream().filter(a->a.stayId().equals(unchecked.id())).map(StayAudit::action)).contains("ARRIVAL_CONFIRM","ARRIVAL_CLEAR");
+ }
+ @Test void arrivalConfirmationRejectsEndedRecordsWithoutChangingOtherDetails(){
+  Stay ended=service.cancel(room309.id(),"test");
+  assertThatThrownBy(()->service.setArrivalConfirmation(ended.id(),new ArrivalConfirmationCommand(true,ended.version()),"test")).isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+  assertThat(service.stay(ended.id())).isEqualTo(ended);
+ }
  @ParameterizedTest @ValueSource(strings={"盛心公寓","伏龙宿舍","花城宿舍","岙底罗"})
  void preparingCleaningEndsOnlySelectedStayAndPreservesHistory(String name){
   long building=repo.addBuilding(new BuildingCommand(name+"清洁测试","测试",true,0));

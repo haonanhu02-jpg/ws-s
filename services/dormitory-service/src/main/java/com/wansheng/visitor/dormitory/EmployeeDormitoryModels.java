@@ -27,13 +27,14 @@ final class EmployeeDormitoryModels {
  record FeeSettlementResult(FeeSettlementBatch batch,List<FeeSettlementEntry> entries) {}
  record BuildingNode(Building building,List<Room> rooms) {}
  record Person(Long id,String name,String centerName,String department,String gender,String category,String positionName,String rankName) {}
- record Stay(Long id,Person person,Bed bed,StayStatus status,String applicationCode,String liaison,String bedType,String threePiece,String threePieceNote,Boolean costCut,Boolean promiseSigned,Boolean cleaningRequired,BigDecimal moveInWater,BigDecimal moveInElectric,BigDecimal moveOutWater,BigDecimal moveOutElectric,LocalDate plannedMoveIn,LocalDate plannedMoveOut,Instant checkedInAt,Instant checkedOutAt,String specialNote,String remark,long version) {}
+ record Stay(Long id,Person person,Bed bed,StayStatus status,String applicationCode,String liaison,String bedType,String threePiece,String threePieceNote,Boolean costCut,Boolean promiseSigned,Boolean cleaningRequired,BigDecimal moveInWater,BigDecimal moveInElectric,BigDecimal moveOutWater,BigDecimal moveOutElectric,LocalDate plannedMoveIn,LocalDate plannedMoveOut,Instant checkedInAt,Instant checkedOutAt,String specialNote,String remark,long version,boolean arrivalConfirmed) {}
  record StayImportSummary(int received,int staysCreated,int staysUpdated,int peopleCreated,List<String> skipped) {}
 
  record BuildingCommand(@NotBlank String name,@NotBlank String regionName,Boolean enabled,Integer displayOrder) {}
  record RoomCommand(@NotNull Long buildingId,@NotBlank String roomNo,@NotNull Integer floorNo,String facing,@NotBlank String roomType,Boolean livable,Boolean cleaningRequired,Integer gridCol,Integer gridRow,Integer gridColSpan,Integer gridRowSpan,Integer displayOrder,String specialNote,Boolean enabled) {}
  record BedCommand(@NotNull Long roomId,@NotBlank String label,@NotBlank String bedCode,String threePiece,Boolean enabled) {}
  record CleaningCommand(@NotNull Boolean required) {}
+ record ArrivalConfirmationCommand(@NotNull Boolean confirmed,@NotNull @PositiveOrZero Long version) {}
  record PrepareCleaningCommand(Long stayId,@PositiveOrZero Long stayVersion,@NotNull LocalDate businessDate) {}
  record PersonCommand(String name,String centerName,String department,@Pattern(regexp="男|女") String gender,String category,String positionName,String rankName) {}
  record ResourceImportCommand(@NotBlank String buildingName,@NotBlank String regionName,@NotBlank String roomNo,@NotNull Integer floorNo,String facing,@NotBlank String roomType,@NotBlank String bedLabel,@NotBlank String bedCode,String threePiece) {}

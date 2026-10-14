@@ -1139,6 +1139,11 @@ tbody tr:hover { background: var(--d86-brand-soft); }
 .dormitory-layout .booking-schedule button.active{outline:2px solid var(--d86-primary);outline-offset:1px}
 .dormitory-layout .booking-schedule button.booked span,.dormitory-layout .booking-schedule button.booked small{color:#b26a00}
 .dormitory-layout .booking-schedule button.occupied span,.dormitory-layout .booking-schedule button.occupied small{color:#1565c0}
+.dormitory-layout .booking-reservation{min-width:0;display:flex;flex-direction:column;gap:6px}
+.dormitory-layout .booking-reservation>button{width:100%;height:100%}
+.dormitory-layout .booking-schedule .arrival-confirmation{display:flex;align-items:center;gap:8px;margin:0;padding:4px 8px;font-size:12px;cursor:pointer}
+.dormitory-layout .booking-schedule .arrival-confirmation input{width:16px;height:16px;flex:none;margin:0;accent-color:var(--d86-brand)}
+.dormitory-layout .booking-schedule .arrival-confirmation span{font-size:12px}
 
 /* A close control stays inside its dialog but outside the scrolling content flow. */
 .modal-card>.drawer-close,.record-dialog>.drawer-close,.detail-drawer>.drawer-close,

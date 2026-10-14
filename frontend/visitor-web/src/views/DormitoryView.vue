@@ -8,6 +8,7 @@ import {
   dormitoryApi,
   dormitoryExtensionApi,
   prepareBedCleaning,
+  setArrivalConfirmation,
   type Bed,
   type BuildingNode,
   type DormitoryStatistics,
@@ -392,6 +393,28 @@ const selectedBedName = computed(() => selectedBed.value ? bedDisplayName(select
 const selectedBedReservations = computed(() => selectedBed.value
   ? activeStays.value.filter((stay) => stay.bed.id === selectedBed.value?.id).sort((a, b) => (b.plannedMoveIn || "").localeCompare(a.plannedMoveIn || "") || b.id - a.id)
   : []);
+const arrivalSaving = ref<number | null>(null);
+async function toggleArrivalConfirmation(stay: Stay, event: Event) {
+  const input = event.target as HTMLInputElement;
+  const confirmed = input.checked;
+  if (arrivalSaving.value !== null) { input.checked = !!stay.arrivalConfirmed; return; }
+  arrivalSaving.value = stay.id;
+  error.value = '';
+  try {
+    if (stay.version == null) throw new Error('住宿记录版本缺失，请刷新后重试');
+    const updated = await setArrivalConfirmation(stay.id, confirmed, stay.version);
+    const flag = { arrivalConfirmed: updated.arrivalConfirmed, version: updated.version };
+    stays.value = stays.value.map(item => item.id === updated.id ? { ...item, ...flag } : item);
+    if (editingStay.value?.id === updated.id) editingStay.value = { ...editingStay.value, ...flag };
+    if (cleaningStay.value?.id === updated.id) cleaningStay.value = { ...cleaningStay.value, ...flag };
+    message.value = confirmed ? '是否入住标记已保存，该人员不再显示预订预警' : '是否入住标记已取消，恢复按原规则显示预订预警';
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : '是否入住标记保存失败';
+  } finally {
+    input.checked = !!stays.value.find(item => item.id === stay.id)?.arrivalConfirmed;
+    arrivalSaving.value = null;
+  }
+}
 const totals = computed(() => {
   const rooms = buildings.value
       .flatMap((b) => b.rooms)
@@ -412,7 +435,7 @@ const alerts = computed(() => ({
   clean: shownBuildings.value
     .flatMap((b) => b.rooms)
     .filter((r) => r.enabled && (r.cleaningRequired || r.beds.some((bed) => bed.enabled && bed.cleaningRequired))),
-  bookedRooms: shownStays.value.filter((stay) => effectiveStayStatus(stay) === "BOOKED"),
+  bookedRooms: shownStays.value.filter((stay) => !stay.arrivalConfirmed && effectiveStayStatus(stay) === "BOOKED"),
   overdue: shownStays.value.filter((s) => s.status === "BOOKED" || s.status === "CHECKED_IN").filter(
     (s) =>
       s.plannedMoveOut &&
@@ -2258,10 +2281,14 @@ onBeforeUnmount(() => {
         <button v-if="selectedBed?.cleaningRequired" type="button" class="secondary-button cleaning-finish" @click="finishBedCleaning">完成打扫</button>
         <div v-if="selectedBedReservations.length" class="booking-schedule">
           <b>连续预订入住人</b>
-          <button v-for="stay in selectedBedReservations" :key="stay.id" type="button" :class="{ active: editingStay?.id === stay.id, booked: effectiveStayStatus(stay) === 'BOOKED', occupied: effectiveStayStatus(stay) === 'CHECKED_IN' }" @click="selectReservation(stay)">
-            <strong>{{ stay.person.name }}</strong><span v-if="stay.plannedMoveIn || stay.plannedMoveOut">{{ stay.plannedMoveIn }} 至 {{ stay.plannedMoveOut }}</span><small>{{ statusLabel(effectiveStayStatus(stay) || stay.status) }} · 点击编辑</small>
-          </button>
+          <div v-for="stay in selectedBedReservations" :key="stay.id" class="booking-reservation">
+            <button type="button" :class="{ active: editingStay?.id === stay.id, booked: effectiveStayStatus(stay) === 'BOOKED', occupied: effectiveStayStatus(stay) === 'CHECKED_IN' }" @click="selectReservation(stay)">
+              <strong>{{ stay.person.name }}</strong><span v-if="stay.plannedMoveIn || stay.plannedMoveOut">{{ stay.plannedMoveIn }} 至 {{ stay.plannedMoveOut }}</span><small>{{ statusLabel(effectiveStayStatus(stay) || stay.status) }} · 点击编辑</small>
+            </button>
+            <label class="arrival-confirmation"><input type="checkbox" :checked="!!stay.arrivalConfirmed" :disabled="arrivalSaving !== null" :aria-label="`${stay.person.name}是否入住`" @change="toggleArrivalConfirmation(stay, $event)" />是否入住<span v-if="arrivalSaving === stay.id">保存中…</span></label>
+          </div>
           <small>选择人员可编辑保存；不选择则继续新增日期不冲突的后续预订。</small>
+          <small>“是否入住”勾选后立即保存，仅控制该人员的预订预警，不改变原日期、状态或房间颜色。</small>
         </div>
         <div class="booking-grid">
           <label>姓名<input v-model.trim="form.name" /></label
