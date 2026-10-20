@@ -8,9 +8,9 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'C:/Users/12778/.c
     await page.clock.install({ time: new Date('2026-10-09T12:00:00+08:00') });
     await page.addInitScript(() => sessionStorage.setItem('visitor-user', JSON.stringify({ username: 'test', role: 'DORM_ADMIN' })));
     const rooms = [317,318,319].map((roomNo,i) => ({ id:i+1,buildingId:1,roomNo:String(roomNo),floorNo:3,facing:'南',roomType:'单间',enabled:true,livable:true,cleaningRequired:false,beds:[{ id:i+1,roomId:i+1,label:'单床',bedCode:`盛心公寓-${roomNo}-单床`,enabled:true,cleaningRequired:false }] }));
-    const stays = rooms.map((r,i) => ({ id:i+1,bed:r.beds[0],person:{id:i+1,name:['尚建华','欧阳春','缺编码'][i],department:'法务部',centerName:'中心',gender:'男',category:'己审批长住员工'},status:i===2?'BOOKED':'CHECKED_IN',plannedMoveIn:i===0?'2026-10-19':'2026-09-01',bedType:'长住房',applicationCode:i===1?'YGRZ2026090001':'',costCut:false }));
+    const stays = rooms.map((r,i) => ({ id:i+1,bed:r.beds[0],person:{id:i+1,name:['尚建华','欧阳春','缺编码'][i],department:'法务部',centerName:'中心',gender:'男',category:'己审批长住员工'},status:i===2?'BOOKED':'CHECKED_IN',arrivalConfirmed:i!==0,plannedMoveIn:i===0?'2026-10-19':'2026-09-01',bedType:'长住房',applicationCode:i===1?'YGRZ2026090001':'',costCut:false }));
     stays[2].plannedMoveOut='2026-10-15';
-    stays.push({...stays[2],id:4,plannedMoveIn:'2026-10-20',plannedMoveOut:undefined,applicationCode:'NEXT-001'});
+    stays.push({...stays[2],id:4,arrivalConfirmed:false,plannedMoveIn:'2026-10-20',plannedMoveOut:undefined,applicationCode:'NEXT-001'});
     await page.route('**/api/visitor/**',async route => {
       const url=new URL(route.request().url()); let body=[];
       if(url.pathname.endsWith('/resources/tree')) body={buildings:[{building:{id:1,name:'盛心公寓',enabled:true,displayOrder:0},rooms}]};
@@ -27,9 +27,9 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'C:/Users/12778/.c
     // Use the bed label so this assertion does not depend on room-number typography.
     const bed=page.locator('.fp-beds button[aria-label^="317"]');
     await bed.first().waitFor();
-    assert(await bed.first().evaluate(el=>el.closest('article').classList.contains('book')), 'future CHECKED_IN record must render as booked room');
-    assert(await bed.first().evaluate(el=>el.classList.contains('booked') && !el.classList.contains('occupied')), 'future bed must only use booked colour');
-    assert(await page.locator('.fp-beds button[aria-label^="319"]').first().evaluate(el=>el.classList.contains('occupied') && !el.classList.contains('booked')), 'past BOOKED record must only use occupied colour');
+    assert(await bed.first().evaluate(el=>el.closest('article').classList.contains('book')), 'unconfirmed CHECKED_IN record must render as booked room');
+    assert(await bed.first().evaluate(el=>el.classList.contains('booked') && !el.classList.contains('occupied')), 'unconfirmed bed must only use booked colour');
+    assert(await page.locator('.fp-beds button[aria-label^="319"]').first().evaluate(el=>el.classList.contains('occupied') && !el.classList.contains('booked')), 'confirmed BOOKED record must only use occupied colour');
     await bed.first().click();
     assert((await page.locator('.booking-schedule button').allTextContents()).join('').includes('已预定'), 'reservation editor must match the map');
     await page.locator('.drawer-close').first().click();

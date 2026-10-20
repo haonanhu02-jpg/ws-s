@@ -43,7 +43,7 @@ class EmployeeDormitoryController {
  @PostMapping("/stays/book") Stay book(@Valid @RequestBody BookCommand c,Principal p){return service.book(c,p.getName());}
  @PutMapping("/stays/{id}") Stay updateStay(@PathVariable long id,@Valid @RequestBody UpdateStayCommand c,Principal p){return service.updateStay(id,c,p.getName());}
  @PutMapping("/stays/{id}/arrival-confirmation") Stay arrivalConfirmation(@PathVariable long id,@Valid @RequestBody ArrivalConfirmationCommand c,Principal p){return service.setArrivalConfirmation(id,c,p.getName());}
- @PostMapping("/stays/{id}/check-in") Stay checkIn(@PathVariable long id,Principal p){return service.checkIn(id,p.getName());}
+ @PostMapping("/stays/{id}/check-in") Stay checkIn(@PathVariable long id,Principal p){return service.checkInAndConfirmArrival(id,p.getName());}
  @PostMapping("/stays/{id}/transfer") Stay transfer(@PathVariable long id,@Valid @RequestBody TransferCommand c,Principal p){return service.transfer(id,c,p.getName());}
  @PostMapping("/stays/{id}/extend") Stay extend(@PathVariable long id,@Valid @RequestBody ExtendCommand c,Principal p){return service.extend(id,c,p.getName());}
  @PostMapping("/stays/{id}/check-out") Stay checkout(@PathVariable long id,@Valid @RequestBody CheckoutCommand c,Principal p){return service.checkout(id,c,p.getName());}

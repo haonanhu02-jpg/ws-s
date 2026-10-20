@@ -36,6 +36,28 @@ class EmployeeStayIsolationTest {
  private UpdateStayCommand details(String name){return details(name,null);}
  private UpdateStayCommand details(String name,LocalDate end){return new UpdateStayCommand(name,"新中心","新部门","男","己审批长住员工","新岗位","新职级","APP-309",null,"长住房",null,null,false,null,false,null,null,null,null,IN,end,null,null);}
  @ParameterizedTest @ValueSource(strings={"盛心公寓","伏龙宿舍","花城宿舍","岙底罗"})
+ void explicitCheckInAlsoConfirmsOnlyTheSelectedArrival(String name){
+  long building=repo.addBuilding(new BuildingCommand(name+"手工入住测试","测试",true,0));
+  Stay current=book(room309.person().id(),building,"201");
+  service.extend(current.id(),new ExtendCommand(IN.plusDays(10),null),"test");current=service.stay(current.id());
+  Stay next=service.book(new BookCommand(current.person().id(),current.bed().id(),"NEXT",null,"长住房",null,null,false,null,false,null,null,null,null,IN.plusDays(11),null,null,null),"test");
+  Stay checked=new EmployeeDormitoryController(service,null).checkIn(current.id(),()->"operator");
+  assertThat(checked.status()).isEqualTo(StayStatus.CHECKED_IN);assertThat(checked.arrivalConfirmed()).isTrue();assertThat(checked.checkedInAt()).isNotNull();
+  assertThat(service.stay(checked.id())).isEqualTo(checked);
+  assertThat(checked).usingRecursiveComparison().ignoringFields("status","checkedInAt","version","arrivalConfirmed").isEqualTo(current);
+  assertThat(service.stay(next.id())).isEqualTo(next);assertThat(service.stay(room309.id())).isEqualTo(room309);assertThat(service.stay(room313.id())).isEqualTo(room313);
+  assertThat(service.stayAudits().stream().filter(a->a.stayId().equals(checked.id())).map(StayAudit::action)).contains("CHECK_IN","ARRIVAL_CONFIRM");
+ }
+ @Test void importedCheckInDoesNotInventManualArrivalConfirmation(){
+  service.cancel(room313.id(),"test");Stay previous=service.stay(room313.id());
+  StayImportCommand row=new StayImportCommand("导入人员","中心","部门","男","己审批长住员工","岗位","T5","测试公寓","313",room313.bed().bedCode(),"IMPORT",null,"长住房",null,null,false,null,false,null,null,null,null,IN,IN.plusDays(10),null,null,"CHECKED_IN");
+  assertThat(service.importStays(java.util.List.of(row),"importer").staysCreated()).isEqualTo(1);
+  Stay imported=service.stays("CHECKED_IN",null,"导入人员").stream().findFirst().orElseThrow();
+  assertThat(imported.arrivalConfirmed()).isFalse();assertThat(imported.checkedInAt()).isNotNull();assertThat(imported.plannedMoveIn()).isEqualTo(IN);assertThat(imported.plannedMoveOut()).isEqualTo(IN.plusDays(10));
+  assertThat(service.stay(room309.id())).isEqualTo(room309);assertThat(service.stay(previous.id())).isEqualTo(previous);
+  assertThat(service.stayAudits().stream().filter(a->a.stayId().equals(imported.id())).map(StayAudit::action)).contains("CHECK_IN").doesNotContain("ARRIVAL_CONFIRM");
+ }
+ @ParameterizedTest @ValueSource(strings={"盛心公寓","伏龙宿舍","花城宿舍","岙底罗"})
  void arrivalConfirmationIsIndependentAndPersistsPerStay(String name){
   long building=repo.addBuilding(new BuildingCommand(name+"确认测试","测试",true,0));
   Stay current=book(room309.person().id(),building,"201");

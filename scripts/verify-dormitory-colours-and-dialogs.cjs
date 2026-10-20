@@ -14,7 +14,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'C:/Users/12778/.c
       const roomNo = ['317', '210', '主卧', '206'][i];
       return { building: { id, name, enabled: true, displayOrder: i }, rooms: [{ id, buildingId: id, roomNo, floorNo: i === 0 ? 3 : 2, facing: '南', roomType: '单间', enabled: true, livable: true, cleaningRequired: false, beds: [{ id, roomId: id, label: '单床', bedCode: `${name}-${roomNo}`, enabled: true, cleaningRequired: false }] }] };
     });
-    const stays = buildings.map((node, i) => ({ id: i + 1, version: 0, bed: node.rooms[0].beds[0], person: { id: i + 1, name: `预订人员${i + 1}`, centerName: '法务中心', department: '法务部', gender: '男', category: '己审批长住员工' }, bedType: '长住房', status: i % 2 ? 'BOOKED' : 'CHECKED_IN', plannedMoveIn: '2026-10-19', plannedMoveOut: '2026-10-20', costCut: false }));
+    const stays = buildings.map((node, i) => ({ id: i + 1, version: 0, arrivalConfirmed: false, bed: node.rooms[0].beds[0], person: { id: i + 1, name: `预订人员${i + 1}`, centerName: '法务中心', department: '法务部', gender: '男', category: '己审批长住员工' }, bedType: '长住房', status: i % 2 ? 'BOOKED' : 'CHECKED_IN', plannedMoveIn: '2026-10-19', plannedMoveOut: '2026-10-20', costCut: false }));
     const next = { ...stays[0], id: 5, plannedMoveIn: '2026-10-21', plannedMoveOut: undefined, person: { ...stays[0].person, name: '后续预订' } };
     stays.push(next);
     const writes = [];
@@ -66,9 +66,12 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'C:/Users/12778/.c
     await page.locator('.region-tabs button').filter({ hasText: '全集团' }).click();
     await page.clock.fastForward(61000);
     const beds = page.locator('.fp-beds button');
-    for (let i = 0; i < await beds.count(); i++) check(await beds.nth(i).evaluate(el => el.classList.contains('occupied') && !el.classList.contains('booked')), 'cross-midnight map must update without reload');
+    for (let i = 0; i < await beds.count(); i++) check(await beds.nth(i).evaluate(el => el.classList.contains('booked') && !el.classList.contains('occupied')), 'cross-midnight must not auto-confirm unchecked arrivals');
+    stays.slice(0,4).forEach(stay => { stay.arrivalConfirmed = true; });
+    await page.reload();
+    await page.locator('.dorm-nav button').filter({ hasText: '可视化平面图' }).click();
     await beds.first().click();
-    check((await page.locator('.booking-schedule button.active').innerText()).includes('已入住'), 'cross-midnight editor must match map');
+    check((await page.locator('.booking-schedule button.active').innerText()).includes('已入住'), 'confirmed editor must match map');
     check(await page.locator('.booking-schedule button.active').evaluate(el => getComputedStyle(el).backgroundColor === 'rgb(219, 234, 254)'), 'occupied editor card must be blue');
     const cleaning = page.locator('.booking-grid label').filter({ hasText: '是否待打扫' }).locator('select');
     await cleaning.selectOption({ label: '是' });
@@ -98,6 +101,6 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'C:/Users/12778/.c
     const after = await resource.locator('.drawer-close').boundingBox();
     check(after && before && Math.abs(after.y - before.y) < 2, 'mobile resource-dialog close must stay fixed while scrolling');
     assert.deepEqual(failures, []);
-    console.log('Four-dormitory reservation colours, midnight update and sticky dialog closes passed');
+    console.log('Four-dormitory confirmation colours, no automatic arrival at midnight, cleaning and sticky dialog closes passed');
   } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });

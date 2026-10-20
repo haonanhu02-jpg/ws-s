@@ -4,6 +4,7 @@ export interface DatedStay {
   status: "BOOKED" | "CHECKED_IN" | "CHECKED_OUT" | "CANCELLED";
   plannedMoveIn: string | null;
   plannedMoveOut?: string;
+  arrivalConfirmed?: boolean;
 }
 
 export function hasVisibleOccupantName(name: string | null | undefined): boolean {
@@ -16,10 +17,10 @@ export function editableGender(value: string | null | undefined): "" | "男" | "
   return gender === "男" || gender === "女" ? gender : "";
 }
 
-export function effectiveOccupancyStatus(stay: DatedStay, businessDate: string): OccupancyStatus | null {
+export function effectiveOccupancyStatus(stay: DatedStay, _businessDate: string): OccupancyStatus | null {
   if (stay.status !== "BOOKED" && stay.status !== "CHECKED_IN") return null;
-  if (!stay.plannedMoveIn) return stay.status;
-  return stay.plannedMoveIn <= businessDate ? "CHECKED_IN" : "BOOKED";
+  // Planned arrival is not evidence of an actual arrival. Only the saved tick is.
+  return stay.arrivalConfirmed === true ? "CHECKED_IN" : "BOOKED";
 }
 
 export function chooseBedStay<T extends DatedStay>(stays: T[], businessDate: string): T | undefined {

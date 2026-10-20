@@ -9,7 +9,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'C:/Users/12778/.c
     await page.addInitScript(() => sessionStorage.setItem('visitor-user', JSON.stringify({ username: 'test', role: 'DORM_ADMIN' })));
     const nodes = ['盛心公寓','伏龙宿舍','花城宿舍','岙底罗'].map((name,i) => ({ building: { id:i+1,name,enabled:true,displayOrder:i }, rooms: [{ id:i+1,buildingId:i+1,roomNo:['317','210','主卧','206'][i],floorNo:i===0?3:2,roomType:'单间',enabled:true,livable:true,cleaningRequired:false,beds:[{id:i+1,roomId:i+1,label:'单床',bedCode:`${name}-测试`,enabled:true,cleaningRequired:true}]}] }));
     // Include a current stay, a future booking and a historical stay per bed.
-    const stays = nodes.flatMap(n => ['CHECKED_IN','BOOKED','CHECKED_OUT'].map((status,j) => ({ id:n.building.id*10+j,version:0,status,person:{id:n.building.id,name:`人员${n.building.id}-${j}`,gender:'男',department:'部门'},bed:n.rooms[0].beds[0],plannedMoveIn:j===1?'2026-10-19':'2026-09-01',plannedMoveOut:j===0?'2026-10-18':undefined,bedType:'长住房',cleaningRequired:false,costCut:false })));
+    const stays = nodes.flatMap(n => ['CHECKED_IN','BOOKED','CHECKED_OUT'].map((status,j) => ({ id:n.building.id*10+j,version:0,status,arrivalConfirmed:j===0,person:{id:n.building.id,name:`人员${n.building.id}-${j}`,gender:'男',department:'部门'},bed:n.rooms[0].beds[0],plannedMoveIn:j===1?'2026-10-19':'2026-09-01',plannedMoveOut:j===0?'2026-10-18':undefined,bedType:'长住房',cleaningRequired:false,costCut:false })));
     const expectedStays = JSON.stringify(stays.map(({bed,...s})=>s));
     const writes=[];
     await page.route('**/api/visitor/**', async route => {

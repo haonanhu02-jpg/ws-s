@@ -407,7 +407,7 @@ async function toggleArrivalConfirmation(stay: Stay, event: Event) {
     stays.value = stays.value.map(item => item.id === updated.id ? { ...item, ...flag } : item);
     if (editingStay.value?.id === updated.id) editingStay.value = { ...editingStay.value, ...flag };
     if (cleaningStay.value?.id === updated.id) cleaningStay.value = { ...cleaningStay.value, ...flag };
-    message.value = confirmed ? '是否入住标记已保存，该人员不再显示预订预警' : '是否入住标记已取消，恢复按原规则显示预订预警';
+    message.value = confirmed ? '已确认入住：显示蓝色，并取消该人员预订预警' : '已取消入住确认：显示黄色预订，并恢复该人员预订预警';
   } catch (e) {
     error.value = e instanceof Error ? e.message : '是否入住标记保存失败';
   } finally {
@@ -435,7 +435,7 @@ const alerts = computed(() => ({
   clean: shownBuildings.value
     .flatMap((b) => b.rooms)
     .filter((r) => r.enabled && (r.cleaningRequired || r.beds.some((bed) => bed.enabled && bed.cleaningRequired))),
-  bookedRooms: shownStays.value.filter((stay) => !stay.arrivalConfirmed && effectiveStayStatus(stay) === "BOOKED"),
+  bookedRooms: shownStays.value.filter((stay) => effectiveStayStatus(stay) === "BOOKED"),
   overdue: shownStays.value.filter((s) => s.status === "BOOKED" || s.status === "CHECKED_IN").filter(
     (s) =>
       s.plannedMoveOut &&
@@ -1824,6 +1824,7 @@ onBeforeUnmount(() => {
         <template v-else-if="!loading && active === 'ledger'"
           ><div class="ledger-heading"><div><span class="section-kicker">住宿业务</span><h2>入住人员台账</h2></div><div class="ledger-heading-right"><div class="ledger-heading-actions"><button class="secondary-button" @click="exportFullStays">导出全部历史明细</button><button class="secondary-button" @click="exportLedger">导出当前在住及预订（完整字段）</button><button class="secondary-button" @click="downloadImportTemplate('stays')">下载完整模板</button><button class="secondary-button" @click="chooseImport('stays')">导入入住数据</button><button class="secondary-button" @click="exportPeople">导出基础人员档案（不含住宿）</button></div><div class="ledger-count"><b>{{ shownStays.length }}</b><span>{{ selectedBuilding ? '当前宿舍' : '全集团' }}</span></div></div></div>
           <div class="ledger-toolbar"><label><span>搜索台账</span><input v-model.trim="ledgerSearch" placeholder="输入姓名、部门、床位或状态" /></label><div class="ledger-legend"><span><i class="dot booked"></i>已预订</span><span><i class="dot living"></i>已入住</span><span><i class="dot done"></i>已退宿</span></div></div>
+          <p class="muted">展示状态以“是否入住”勾选为准。台账中的“办理入住／退宿手续”保留原业务流程，不会因计划日期到达而自动办理。</p>
           <div class="table-wrap">
             <table>
               <thead>
@@ -1854,7 +1855,7 @@ onBeforeUnmount(() => {
                       v-if="s.status === 'BOOKED'"
                       @click="act(s, 'check-in')"
                     >
-                      入住</button
+                      办理入住手续</button
                     ><button
                       v-if="s.status === 'BOOKED'"
                       class="secondary"
@@ -1877,7 +1878,7 @@ onBeforeUnmount(() => {
                       v-if="s.status === 'CHECKED_IN'"
                       @click="act(s, 'check-out')"
                     >
-                      退宿
+                      办理退宿手续
                     </button>
                     <button
                       class="secondary"
@@ -2288,7 +2289,7 @@ onBeforeUnmount(() => {
             <label class="arrival-confirmation"><input type="checkbox" :checked="!!stay.arrivalConfirmed" :disabled="arrivalSaving !== null" :aria-label="`${stay.person.name}是否入住`" @change="toggleArrivalConfirmation(stay, $event)" />是否入住<span v-if="arrivalSaving === stay.id">保存中…</span></label>
           </div>
           <small>选择人员可编辑保存；不选择则继续新增日期不冲突的后续预订。</small>
-          <small>“是否入住”勾选后立即保存，仅控制该人员的预订预警，不改变原日期、状态或房间颜色。</small>
+          <small>“是否入住”勾选后立即保存：勾选为蓝色已入住、不再预警；未勾选为黄色预订、继续预警，不因日期到了自动入住。已退宿或取消的记录不受影响。</small>
         </div>
         <div class="booking-grid">
           <label>姓名<input v-model.trim="form.name" /></label

@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'C:/Users/12778/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
 const names = ['岙底罗', '花城宿舍', '伏龙宿舍', '盛心公寓'];
 const buildings = names.map((name, i) => ({ building: { id: i + 1, name, regionName: '总部', enabled: true, displayOrder: i }, rooms: Array.from({ length: 24 }, (_, j) => ({ id: i * 100 + j + 1, buildingId: i + 1, roomNo: String(201 + j), floorNo: 2, facing: '南', roomType: '单间', livable: true, enabled: true, displayOrder: j, cleaningRequired: false, beds: [{ id: i * 100 + j + 1, roomId: i * 100 + j + 1, label: '单床', bedCode: `${name}-${201+j}-单床`, enabled: true, cleaningRequired: false }] })) }));
-const stays = buildings.map((n, i) => ({ id: i+1, bed: n.rooms[0].beds[0], person: { id: i+1, name: `人员${i}`, department: '部门', centerName: '中心', gender: '男', category: '员工' }, status: 'BOOKED', plannedMoveIn: '2026-01-01', bedType: '长住房', costCut: true }));
+const stays = buildings.map((n, i) => ({ id: i+1, bed: n.rooms[0].beds[0], person: { id: i+1, name: `人员${i}`, department: '部门', centerName: '中心', gender: '男', category: '员工' }, status: 'BOOKED', arrivalConfirmed: true, plannedMoveIn: '2026-01-01', bedType: '长住房', costCut: true }));
 (async () => {
   const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROME_PATH || 'C:/Program Files/Google/Chrome/Application/chrome.exe' });
   try {

@@ -4,9 +4,16 @@ import { chooseBedStay, classifyRoomBeds, editableGender, effectiveBeds, effecti
 describe("dormitory occupancy presentation", () => {
   const businessDate = "2026-09-15";
 
+  it("uses the manual arrival tick on the move-in day instead of assuming arrival", () => {
+    const stay = { status: "BOOKED" as const, plannedMoveIn: businessDate, arrivalConfirmed: false };
+    expect(effectiveOccupancyStatus(stay, businessDate)).toBe("BOOKED");
+    expect(effectiveOccupancyStatus({ ...stay, arrivalConfirmed: true }, businessDate)).toBe("CHECKED_IN");
+    expect(effectiveOccupancyStatus({ ...stay, status: "CHECKED_IN" }, businessDate)).toBe("BOOKED");
+  });
+
   it("reconciles 51 beds with 36 occupants including two without gender", () => {
-    const stay = (gender: string) => ({ status: "CHECKED_IN" as const, plannedMoveIn: "2026-09-01", person: { name: "入住人", gender } });
-    const beds = [...Array(20).fill(stay("男")), ...Array(14).fill(stay("女")), stay(""), stay("未填写"), ...Array(13).fill(undefined), ...Array(2).fill({ ...stay("男"), status: "BOOKED", plannedMoveIn: "2026-10-19" })];
+    const stay = (gender: string) => ({ status: "CHECKED_IN" as const, arrivalConfirmed: true, plannedMoveIn: "2026-09-01", person: { name: "入住人", gender } });
+    const beds = [...Array(20).fill(stay("男")), ...Array(14).fill(stay("女")), stay(""), stay("未填写"), ...Array(13).fill(undefined), ...Array(2).fill({ ...stay("男"), arrivalConfirmed: false, status: "BOOKED", plannedMoveIn: "2026-10-19" })];
     const counts = classifyRoomBeds(beds, businessDate, "单间");
     expect(counts).toMatchObject({ occupiedMale: 20, occupiedFemale: 14, occupiedOther: 2, bookedMale: 2 });
     expect(Object.values(counts).reduce((sum, value) => sum + value, 0)).toBe(51);
@@ -23,7 +30,8 @@ describe("dormitory occupancy presentation", () => {
 
   it("does not invent an arrival date for undated records", () => {
     expect(effectiveOccupancyStatus({ status: "BOOKED", plannedMoveIn: null }, businessDate)).toBe("BOOKED");
-    expect(effectiveOccupancyStatus({ status: "CHECKED_IN", plannedMoveIn: null }, businessDate)).toBe("CHECKED_IN");
+    expect(effectiveOccupancyStatus({ status: "CHECKED_IN", plannedMoveIn: null, arrivalConfirmed: true }, businessDate)).toBe("CHECKED_IN");
+    expect(effectiveOccupancyStatus({ status: "CHECKED_IN", plannedMoveIn: null, arrivalConfirmed: false }, businessDate)).toBe("BOOKED");
     expect(chooseBedStay([{status: "BOOKED", plannedMoveIn: null}, {status: "BOOKED", plannedMoveIn: "2026-10-19"}], businessDate)).toBeDefined();
   });
 
@@ -38,27 +46,30 @@ describe("dormitory occupancy presentation", () => {
     expect(hasVisibleOccupantName("陈郭静")).toBe(true);
   });
 
-  it("shows a booked stay whose move-in date has arrived as checked in", () => {
-    expect(effectiveOccupancyStatus({ status: "BOOKED", plannedMoveIn: "2026-09-13" }, businessDate)).toBe("CHECKED_IN");
+  it("does not automatically confirm a booking after its arrival date", () => {
+    expect(effectiveOccupancyStatus({ status: "BOOKED", plannedMoveIn: "2026-09-13", arrivalConfirmed: false }, businessDate)).toBe("BOOKED");
+    expect(effectiveOccupancyStatus({ status: "BOOKED", plannedMoveIn: "2026-09-13", arrivalConfirmed: false }, "2026-09-20")).toBe("BOOKED");
+    expect(effectiveOccupancyStatus({ status: "BOOKED", plannedMoveIn: "2026-09-13", arrivalConfirmed: true }, businessDate)).toBe("CHECKED_IN");
   });
 
   it("keeps a future stay booked", () => {
     expect(effectiveOccupancyStatus({ status: "BOOKED", plannedMoveIn: "2026-09-16" }, businessDate)).toBe("BOOKED");
   });
 
-  it("uses future move-in dates even when the saved state is CHECKED_IN", () => {
-    expect(effectiveOccupancyStatus({ status: "CHECKED_IN", plannedMoveIn: "2026-10-19" }, "2026-10-09")).toBe("BOOKED");
+  it("uses the explicit tick rather than saved status or future dates", () => {
+    expect(effectiveOccupancyStatus({ status: "CHECKED_IN", plannedMoveIn: "2026-10-19", arrivalConfirmed: false }, "2026-10-09")).toBe("BOOKED");
+    expect(effectiveOccupancyStatus({ status: "BOOKED", plannedMoveIn: "2026-10-19", arrivalConfirmed: true }, "2026-10-09")).toBe("CHECKED_IN");
   });
 
-  it("preserves terminal states and counts today's move-in as occupied", () => {
+  it("preserves terminal states even when an old tick remains saved", () => {
     for (const status of ["CANCELLED", "CHECKED_OUT"] as const)
-      expect(effectiveOccupancyStatus({ status, plannedMoveIn: "2026-09-01" }, businessDate)).toBeNull();
-    expect(effectiveOccupancyStatus({ status: "CHECKED_IN", plannedMoveIn: businessDate }, businessDate)).toBe("CHECKED_IN");
+      expect(effectiveOccupancyStatus({ status, plannedMoveIn: "2026-09-01", arrivalConfirmed: true }, businessDate)).toBeNull();
+    expect(effectiveOccupancyStatus({ status: "CHECKED_IN", plannedMoveIn: businessDate, arrivalConfirmed: true }, businessDate)).toBe("CHECKED_IN");
   });
 
   it("uses the current dated stay instead of a later consecutive reservation", () => {
-    const current = { id: 1, status: "BOOKED" as const, plannedMoveIn: "2026-09-13", plannedMoveOut: "2026-09-15" };
-    const future = { id: 2, status: "BOOKED" as const, plannedMoveIn: "2026-09-16" };
+    const current = { id: 1, status: "BOOKED" as const, arrivalConfirmed: true, plannedMoveIn: "2026-09-13", plannedMoveOut: "2026-09-15" };
+    const future = { id: 2, status: "BOOKED" as const, arrivalConfirmed: false, plannedMoveIn: "2026-09-16" };
     expect(chooseBedStay([future, current], businessDate)?.id).toBe(1);
   });
 
@@ -67,7 +78,7 @@ describe("dormitory occupancy presentation", () => {
   });
 
   it("assigns the empty bed in a twin room to the current occupant gender", () => {
-    const man = { status: "BOOKED" as const, plannedMoveIn: "2026-09-13", person: { name: "入住人", gender: "男" as const } };
+    const man = { status: "BOOKED" as const, arrivalConfirmed: true, plannedMoveIn: "2026-09-13", person: { name: "入住人", gender: "男" as const } };
     expect(classifyRoomBeds([man, undefined], businessDate)).toMatchObject({ occupiedMale: 1, freeMale: 1, freePending: 0 });
   });
 
@@ -79,7 +90,7 @@ describe("dormitory occupancy presentation", () => {
   });
 
   it("only assigns gender in an occupied twin room and excludes cleaning beds", () => {
-    const woman = { status: "CHECKED_IN" as const, plannedMoveIn: "2026-09-13", person: { name: "入住人", gender: "女" } };
+    const woman = { status: "CHECKED_IN" as const, arrivalConfirmed: true, plannedMoveIn: "2026-09-13", person: { name: "入住人", gender: "女" } };
     expect(classifyRoomBeds([woman, undefined], businessDate, "单间")).toMatchObject({ freePending: 1, freeFemale: 0 });
     expect(classifyRoomBeds([woman, undefined, undefined], businessDate, "标间", [false, false, true])).toMatchObject({ occupiedFemale: 1, freeFemale: 1, freePending: 0 });
     expect(classifyRoomBeds([undefined, undefined], businessDate, "标间")).toMatchObject({ freePending: 2, freeMale: 0, freeFemale: 0 });

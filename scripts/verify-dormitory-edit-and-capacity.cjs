@@ -20,7 +20,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'C:/Users/12778/.c
       if (pathname.endsWith('/imports/stays')) {
         for (const command of req.postDataJSON()) {
           const bed = nodes.flatMap(n => n.rooms).flatMap(r => r.beds).find(b => b.bedCode === command.bedCode);
-          stays.push({ ...command, id: bed.id, version: 0, bed, status: 'CHECKED_IN', person: { id: bed.id, name: command.name, centerName: command.centerName, department: command.department, gender: command.gender || '未填写', category: command.category || '未分类' }, cleaningRequired: false });
+          stays.push({ ...command, id: bed.id, version: 0, bed, status: 'CHECKED_IN', arrivalConfirmed: false, person: { id: bed.id, name: command.name, centerName: command.centerName, department: command.department, gender: command.gender || '未填写', category: command.category || '未分类' }, cleaningRequired: false });
         }
         return route.fulfill({ json: { staysCreated: 4, staysUpdated: 0, peopleCreated: 4, skipped: [] } });
       }
@@ -65,6 +65,8 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'C:/Users/12778/.c
       assert.equal(data.rowCount, 2, 'export follows selected dormitory');
     }
     assert.equal(writes.length, 4);
+    // Capacity fixtures below represent residents explicitly confirmed after import.
+    stays.forEach(stay => { stay.arrivalConfirmed = true; });
     let resourceId = 100;
     const roomNos = [['319','321','323','325','327','329','331'], ['209','208','207','206','205','204','203'], ['次卧1','次卧2','次卧3','次卧4','次卧5','次卧6','次卧7'], ['205','204','203','202','201','207','208']];
     for (const [index, n] of nodes.entries()) {
@@ -74,7 +76,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'C:/Users/12778/.c
         for (let j = 0; j < (kind < 4 ? 2 : 1); j++) room.beds.push({ id: resourceId++, roomId: id, bedCode: `capacity-${id}-${j}`, label: j ? '靠门' : '靠窗', enabled: true, cleaningRequired: kind === 4 });
         n.rooms.push(room);
         if ([0,1,3,5].includes(kind)) {
-          stays.push({ id: resourceId++, bed: room.beds[0], status: 'CHECKED_IN', plannedMoveIn: kind === 3 ? '2026-10-19' : '2026-09-01', person: { id: resourceId++, name: kind === 5 ? '未填写' : `统计人员${kind}`, gender: kind === 1 || kind === 5 ? '女' : '男', department: '部门' }, bedType: '长住房' });
+          stays.push({ id: resourceId++, bed: room.beds[0], status: 'CHECKED_IN', arrivalConfirmed: kind !== 3, plannedMoveIn: kind === 3 ? '2026-10-19' : '2026-09-01', person: { id: resourceId++, name: kind === 5 ? '未填写' : `统计人员${kind}`, gender: kind === 1 || kind === 5 ? '女' : '男', department: '部门' }, bedType: '长住房' });
         }
       }
     }

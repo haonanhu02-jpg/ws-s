@@ -11,13 +11,13 @@ const {chromium} = require(process.env.PLAYWRIGHT_MODULE || 'C:/Users/12778/.cac
   const stays=[];
   const nodes=['盛心公寓','伏龙宿舍','花城宿舍','岙底罗'].map((name,i)=>({building:{id:i+1,name,enabled:true,displayOrder:i},rooms:['live','disabled','public','free','book','clean'].map((state,j)=>{
    const id=i*10+j+1,bed={id,roomId:id,label:'单床',bedCode:name+'-'+j,enabled:true,cleaningRequired:state==='clean'};
-   if(['live','book'].includes(state))stays.push({id,bed,person:{id,name:'人员'+id,gender:'男',department:'部门'},status:'BOOKED',plannedMoveIn:state==='live'?'2026-10-01':'2026-11-01',costCut:false,cleaningRequired:false});
+   if(['live','book'].includes(state))stays.push({id,bed,person:{id,name:'人员'+id,gender:'男',department:'部门'},status:'BOOKED',arrivalConfirmed:state==='live',plannedMoveIn:state==='live'?'2026-10-01':'2026-11-01',costCut:false,cleaningRequired:false});
    return {id,buildingId:i+1,roomNo:['210','209','208','207','206','205'][j],floorNo:2,roomType:'单间',enabled:state!=='disabled',livable:state!=='public',cleaningRequired:state==='clean',beds:[bed]};
   })}));
   for(const [index,node]of nodes.entries())for(const [offset,status]of ['CHECKED_IN','BOOKED'].entries()){
    const id=index*10+7+offset,bed={id,roomId:id,label:'单床',bedCode:node.building.name+'-other-'+offset,enabled:true,cleaningRequired:false};
    node.rooms.push({id,buildingId:node.building.id,roomNo:String(201+offset),floorNo:2,roomType:'单间',enabled:true,livable:true,cleaningRequired:false,beds:[bed]});
-   stays.push({id,bed,person:{id,name:'未知性别'+id,gender:offset?'未填写':'',department:'部门'},status,plannedMoveIn:offset?'2026-11-01':'2026-10-01',costCut:false,cleaningRequired:false});
+   stays.push({id,bed,person:{id,name:'未知性别'+id,gender:offset?'未填写':'',department:'部门'},status,arrivalConfirmed:offset===0,plannedMoveIn:offset?'2026-11-01':'2026-10-01',costCut:false,cleaningRequired:false});
   }
   await page.route('**/api/visitor/**',route=>{
    assert.equal(route.request().method(),'GET','diagnostic must not write business data');
