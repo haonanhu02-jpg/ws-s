@@ -431,17 +431,19 @@ const totals = computed(() => {
     free: Math.max(0, beds.length - booked - occupied),
   };
 });
+// Match the floorplan's visible-person rule without deleting optional blank records.
+const personAlertStays = computed(() => shownStays.value.filter(stay => hasVisibleOccupantName(stay.person.name)));
 const alerts = computed(() => ({
   clean: shownBuildings.value
     .flatMap((b) => b.rooms)
     .filter((r) => r.enabled && (r.cleaningRequired || r.beds.some((bed) => bed.enabled && bed.cleaningRequired))),
-  bookedRooms: shownStays.value.filter((stay) => effectiveStayStatus(stay) === "BOOKED"),
-  overdue: shownStays.value.filter((s) => s.status === "BOOKED" || s.status === "CHECKED_IN").filter(
+  bookedRooms: personAlertStays.value.filter((stay) => effectiveStayStatus(stay) === "BOOKED"),
+  overdue: personAlertStays.value.filter((s) => s.status === "BOOKED" || s.status === "CHECKED_IN").filter(
     (s) =>
       s.plannedMoveOut &&
       s.plannedMoveOut <= today(),
   ),
-  missingEmployeeApplication: shownStays.value.filter((s) => s.status === "BOOKED" || s.status === "CHECKED_IN").filter((stay) =>
+  missingEmployeeApplication: personAlertStays.value.filter((s) => s.status === "BOOKED" || s.status === "CHECKED_IN").filter((stay) =>
     ![2, 3].includes(buildingRank(stayLocation(stay).buildingName)) &&
     (["已审批长住员工", "已审批长住人员", "己审批长住员工"].includes(stay.person.category || "") || ["长住房", "长住房间"].includes(stay.bedType || ""))
     && !stay.applicationCode?.trim() && !!stay.plannedMoveIn && stay.plannedMoveIn <= today(),

@@ -10,6 +10,11 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'C:/Users/12778/.cache/c
   await page.addInitScript(()=>sessionStorage.setItem('visitor-user',JSON.stringify({username:'test',role:'DORM_ADMIN'})));
   const nodes=['盛心公寓','伏龙宿舍','花城宿舍','岙底罗'].map((name,i)=>({building:{id:i+1,name,enabled:true,displayOrder:i},rooms:[{id:i+1,buildingId:i+1,roomNo:['317','210','主卧','206'][i],floorNo:i?2:3,roomType:'单间',enabled:true,livable:true,cleaningRequired:false,beds:[{id:i+1,roomId:i+1,bedCode:'BED-'+i,label:'单床',enabled:true,cleaningRequired:false}]}]}));
   const stays=nodes.flatMap((node,i)=>[0,1].map(j=>({id:i*2+j+1,version:0,arrivalConfirmed:false,bed:node.rooms[0].beds[0],status:i%2?'CHECKED_IN':'BOOKED',plannedMoveIn:j?'2026-11-01':'2026-10-20',plannedMoveOut:j?'2026-11-10':'2026-10-23',person:{id:1,name:j?'后续人员'+i:'同名人员',centerName:'中心',department:'部门',gender:'男',category:'己审批长住员工'},bedType:'长住房',costCut:false,cleaningRequired:false})));
+  // Empty/import-placeholder records must not generate any person-related warning.
+  for(const i of nodes.keys()) for(const [j,name] of ['', '   ', '未填写'].entries()) stays.push({
+   ...stays[i*2],id:100+i*3+j,plannedMoveIn:'2026-10-20',plannedMoveOut:'2026-10-20',applicationCode:'',
+   person:{id:100+i*3+j,name,centerName:'',department:'',gender:'',category:'已审批长住员工'},
+  });
   const original=JSON.parse(JSON.stringify(stays)),writes=[];let failNext=false;
   await page.route('**/api/visitor/**',route=>{
    const req=route.request(),path=new URL(req.url()).pathname;
@@ -31,7 +36,8 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'C:/Users/12778/.cache/c
   await page.goto(process.env.SCOPE_URL||'http://127.0.0.1:5173/visitor/dormitory');
   for(const [i,node]of nodes.entries()){
    await page.locator('.region-tabs button').filter({hasText:node.building.name}).click();
-   await nav('预警看板').click();assert.equal(await warning.locator('p:not(.muted)').count(),2);
+   await nav('预警看板').click();assert.equal(await warning.locator('p:not(.muted)').count(),2,'Unnamed records are not booking warnings');
+   for(const title of ['退房提醒','员工入住申请单编码']) assert.equal(await page.locator('.warning-columns article').filter({has:page.locator('h3',{hasText:title})}).locator('p:not(.muted)').count(),title==='员工入住申请单编码'&&i<2?1:0,'Unnamed records are not '+title+' warnings; named reminders remain unchanged');
    await open();
    const checkbox=page.getByRole('checkbox',{name:'同名人员是否入住',exact:true});
    assert.equal(await checkbox.isChecked(),false);
@@ -65,6 +71,11 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'C:/Users/12778/.cache/c
    assert.deepEqual(stays.map(({version,arrivalConfirmed,...rest})=>rest),original.map(({version,arrivalConfirmed,...rest})=>rest),'all original fields/statuses/dates and other stays remain unchanged');
   }
   assert.equal(writes.length,8);
+  await page.locator('.region-tabs button').filter({hasText:'全集团'}).click();await nav('预警看板').click();
+  assert.equal(await warning.locator('p:not(.muted)').count(),8,'Group view counts only the eight named reservations');
+  nodes[0].rooms[0].beds[0].cleaningRequired=true;await page.reload();await nav('预警看板').click();
+  assert.equal(await page.locator('.warning-columns article').filter({has:page.locator('h3',{hasText:'待打扫'})}).locator('p:not(.muted)').count(),1,'Resource cleaning reminders are not hidden by the person-name filter');
+  await page.locator('.region-tabs button').filter({hasText:nodes.at(-1).building.name}).click();
   await page.clock.fastForward(6*86400000);await nav('预警看板').click();assert.equal(await warning.locator('p:not(.muted)').count(),2,'Date advancement never assumes an unchecked guest has arrived');
   await open();assert.equal(await page.locator('.booking-schedule button.active').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(255, 248, 225)');
   console.log('Four-dormitory manual arrival synchronizes yellow/blue cards and beds, ledger, occupancy and alerts; preserves records and survives dates/reload/errors');
